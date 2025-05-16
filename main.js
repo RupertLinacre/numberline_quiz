@@ -19,7 +19,7 @@ numberlineRenderer.init();
 window.numberlineRendererRef = numberlineRenderer;
 
 const uiElements = {
-    markerValueDisplay: document.getElementById('marker-value-display'),
+    // markerValueDisplay: document.getElementById('marker-value-display'),
     questionDisplay: document.getElementById('question-display'),
     feedbackArea: document.getElementById('feedback-area'),
     scoreDisplay: document.getElementById('score-display'),

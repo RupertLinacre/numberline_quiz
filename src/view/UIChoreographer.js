@@ -2,7 +2,7 @@ import * as d3 from 'd3';
 
 export class UIChoreographer {
     constructor(elements, eventBus, config) {
-        this.elements = elements; // { markerValueDisplay: domElement, ... }
+        this.elements = elements; // markerValueDisplay removed
         // Add submitAnswerButton to elements if not already present
         if (!this.elements.submitAnswerButton) {
             this.elements.submitAnswerButton = document.getElementById('submit-answer-button');
@@ -22,12 +22,7 @@ export class UIChoreographer {
                 this.eventBus.emit('NEXT_QUESTION_CLICKED');
             });
         }
-        this.eventBus.on('MARKER_DRAGGED', (data) => {
-            if (this.elements.markerValueDisplay) {
-                // Use a formatter if available
-                this.elements.markerValueDisplay.textContent = `Marker: ${d3.format(".4~f")(data.currentValue)}`;
-            }
-        });
+        // No markerValueDisplay update needed
 
         // Subscribe to NEW_QUESTION_READY
         this.eventBus.on('NEW_QUESTION_READY', (data) => {
