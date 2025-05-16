@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Numberline Challenge</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <div id="app">
+    <h1>Numberline Challenge</h1>
+    <div id="question-display">Question will appear here...</div>
+    <div id="numberline-container">
+      <svg id="numberline-svg"></svg>
+    </div>
+    <div id="marker-value-display">Marker: ---</div>
+    <div id="controls">
+      <button id="start-game-button">Start Game</button>
+      <button id="submit-answer-button">Submit Answer</button>
+      <button id="next-question-button" style="display:none;">Next Question</button>
+    </div>
+    <div id="feedback-area"></div>
+    <div id="score-display">Score: 0</div>
+  </div>
+  <script type="module" src="/main.js"></script>
+</body>
+
+</html>
