@@ -155,14 +155,18 @@ export class NumberlineRenderer {
 
         this.marker = this.chartArea.append('g').attr('class', 'draggable-marker');
 
+        // Use config for marker line length and circle radius
+        const markerLineLengthRatio = (this.config.markerConfig && this.config.markerConfig.lineWidthToMajorTickRatio) || 1.5;
+        const majorTickLen = this.config.majorTickLength || 20;
+
         this.marker.append('line')
-            .attr('y1', -(this.config.majorTickLength || 10) * 1.5)
-            .attr('y2', (this.config.majorTickLength || 10) * 1.5)
+            .attr('y1', -(majorTickLen * markerLineLengthRatio))
+            .attr('y2', (majorTickLen * markerLineLengthRatio))
             .attr('stroke-width', 2); // Color from CSS
 
         this.marker.append('circle')
             .attr('cy', 0)
-            .attr('r', 5)
+            .attr('r', (this.config.markerConfig && this.config.markerConfig.circleRadius) || 10)
             .style('cursor', 'ew-resize'); // Color from CSS
 
         const dragBehavior = d3.drag()
@@ -332,7 +336,7 @@ export class NumberlineRenderer {
 
         ticks.append('line')
             .attr('y1', 0)
-            .attr('y2', d => d.isMajor ? (this.config.majorTickLength || 10) : (this.config.minorTickLength || 5));
+            .attr('y2', d => d.isMajor ? (this.config.majorTickLength || 20) : (this.config.minorTickLength || 10));
         // Stroke color from CSS
 
         ticks.filter(d => d.isMajor)
@@ -346,9 +350,9 @@ export class NumberlineRenderer {
                 return isMultipleOfAllowedMagnitude;
             })
             .append('text')
-            .attr('y', (this.config.majorTickLength || 10) + 12)
+            .attr('y', (this.config.majorTickLength || 20) + ((this.config.labelFontSizePx || 20) * 0.8))
             .attr('text-anchor', 'middle')
-            .attr('font-size', '10px')
+            .attr('font-size', `${this.config.labelFontSizePx || 20}px`)
             .text(d => formatNumber(d.value));
 
         this._updateMarkerScreenPosition();
@@ -357,14 +361,18 @@ export class NumberlineRenderer {
         if (this.correctAnswerHighlightValue !== null) {
             const xPosition = currentScale(this.correctAnswerHighlightValue);
             if (isFinite(xPosition) && !isNaN(xPosition)) {
-                const highlightLength = (this.config.majorTickLength || 10) * 1.8;
+                const highlightLengthRatio = (this.config.correctAnswerHighlightConfig && this.config.correctAnswerHighlightConfig.lengthToMajorTickRatio) || 1.8;
+                const highlightBaseLength = this.config.majorTickLength || 20;
+                const highlightLength = highlightBaseLength * highlightLengthRatio;
+                const highlightStrokeWidth = (this.config.correctAnswerHighlightConfig && this.config.correctAnswerHighlightConfig.strokeWidth) || 6;
+
                 this.chartArea.append('line')
                     .attr('class', 'correct-answer-highlight')
                     .attr('x1', xPosition)
                     .attr('x2', xPosition)
                     .attr('y1', -highlightLength / 2)
                     .attr('y2', highlightLength / 2)
-                    .attr('stroke-width', 3); // Color from CSS
+                    .attr('stroke-width', highlightStrokeWidth); // Use new config
             } else {
                 if (this.config.debug) console.warn("Cannot draw correct answer highlight, position not finite/NaN for value:", this.correctAnswerHighlightValue);
             }
