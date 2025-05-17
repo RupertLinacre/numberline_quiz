@@ -34,7 +34,7 @@ body {
 
 #app {
   width: 100%;
-  max-width: 1200px; /* Optional: Set a max-width for very large screens */
+
   margin: 0 auto;
   padding: 20px; /* Padding around the entire app content */
   text-align: center;
