@@ -10,7 +10,7 @@ export const config = {
     midMinorTickLength: 18, // Length for mid-point minor ticks (e.g., 0.5, 5, 50)
     minZoomScale: 0.01, // Allow more zoom out
     maxZoomScale: 1000, // Allow more zoom in
-    answerTolerance: 0.01,
+
     // For _calculateTickLevels, these might need adjustment based on visual testing
     targetMajorTicksOnScreen: 5,
     minPixelSeparationForMajor: 200, // Min pixels between major ticks before trying to change step
@@ -24,7 +24,7 @@ export const config = {
         lineWidthToMajorTickRatio: 1.5
     },
     correctAnswerHighlightConfig: { // New: Correct answer highlight configurations
-        strokeWidth: 6,
-        lengthToMajorTickRatio: 1.8
+        strokeWidth: 3,
+        lengthToMajorTickRatio: 2.8
     },
 };
