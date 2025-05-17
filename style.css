@@ -1,0 +1,181 @@
+/* style.css */
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark; /* Basic theme support */
+  /* Adjust colors as needed, or use a more robust theming solution if desired */
+  color: #333; /* Default light mode text color */
+  background-color: #f8f9fa; /* Default light mode background */
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color: rgba(255, 255, 255, 0.87);
+    background-color: #242424;
+  }
+}
+
+body {
+  margin: 0;
+  padding: 0; /* Remove default body margin */
+  display: flex;
+  flex-direction: column; /* Align children vertically */
+  align-items: center; /* Center #app horizontally */
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+#app {
+  width: 100%;
+  max-width: 1200px; /* Optional: Set a max-width for very large screens */
+  margin: 0 auto;
+  padding: 20px; /* Padding around the entire app content */
+  text-align: center;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 15px; /* Spacing between direct children of #app */
+}
+
+h1 {
+  font-size: 2.2em; /* Adjusted for better responsiveness */
+  line-height: 1.1;
+  margin-bottom: 0.5em;
+}
+
+#numberline-container {
+  width: 100%; /* Take full width of its parent (#app) */
+  border: 1px solid #ccc;
+  box-sizing: border-box;
+  /* The height of the SVG will be set by config.svgHeight */
+}
+
+#numberline-svg {
+  display: block; /* Removes extra space below SVG if it's inline */
+  width: 100%;
+  /* height will be set via JavaScript using config.svgHeight, applied directly or via viewBox */
+}
+
+#controls {
+  display: flex;
+  flex-wrap: wrap; /* Allow buttons to wrap on smaller screens */
+  justify-content: center;
+  gap: 10px; /* Spacing between control buttons */
+  margin: 15px 0;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.25s;
+  background-color: #e9ecef; /* Light mode button */
+  color: #333;
+}
+
+@media (prefers-color-scheme: dark) {
+  button {
+    background-color: #3a3a3a; /* Dark mode button */
+    color: rgba(255, 255, 255, 0.87);
+  }
+}
+
+button:hover {
+  border-color: #646cff;
+}
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+#feedback-area {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 4px;
+  min-height: 1.5em; /* Ensure it has some height even when empty */
+}
+
+#feedback-area.info {
+  background-color: #e7f3ff;
+  color: #00529B;
+  border: 1px solid #b8dcfc;
+}
+#feedback-area.success {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+#feedback-area.warning {
+  background-color: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeeba;
+}
+#feedback-area.error {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+#score-display {
+  font-weight: bold;
+  font-size: 1.2em;
+}
+
+/* Ensure tick text is visible in both light and dark modes */
+.tick text {
+  fill: currentColor; /* Inherits color from parent, good for theme changes */
+}
+
+.tick.major line {
+  stroke: #333;
+}
+.tick.minor line {
+  stroke: #aaa;
+}
+@media (prefers-color-scheme: dark) {
+  .tick.major line {
+    stroke: #ccc;
+  }
+  .tick.minor line {
+    stroke: #666;
+  }
+}
+.axis-line {
+  stroke: #333;
+}
+@media (prefers-color-scheme: dark) {
+  .axis-line {
+    stroke: #ccc;
+  }
+}
+
+.draggable-marker line, .draggable-marker circle {
+    stroke: #d9534f; /* A reddish color */
+    fill: #d9534f;
+}
+@media (prefers-color-scheme: dark) {
+    .draggable-marker line, .draggable-marker circle {
+        stroke: #e57373;
+        fill: #e57373;
+    }
+}
+
+.correct-answer-highlight {
+    stroke: #5cb85c; /* A greenish color */
+}
+@media (prefers-color-scheme: dark) {
+    .correct-answer-highlight {
+        stroke: #81c784;
+    }
+}
