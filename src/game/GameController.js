@@ -48,23 +48,67 @@ export class GameController {
         }
 
         const targetValue = this.currentQuestion.value;
+        let dynamicTolerance;
+
+        if (this.currentQuestion.type === 'fraction') {
+            // For fractions: tolerance is 5% of the target value (absolute)
+            dynamicTolerance = Math.abs(targetValue * 0.05);
+            if (this.config.debug) console.log(`Fraction Question: Target=${targetValue}, Tolerance (5%)=${dynamicTolerance}`);
+        } else if (this.currentQuestion.type === 'decimal') {
+            // For decimals: tolerance is based on the question's contextual magnitude
+            // questionContextualMagnitude is e.g., 0.1 for one decimal place, 0.01 for two.
+            const contextualMagnitude = this.currentQuestion.initialViewParams?.questionContextualMagnitude;
+
+            if (contextualMagnitude && contextualMagnitude > 0 && isFinite(contextualMagnitude)) {
+                dynamicTolerance = contextualMagnitude * 0.25; // e.g., if 0.1, tol = 0.025; if 0.01, tol = 0.0025
+                if (this.config.debug) console.log(`Decimal Question: Target=${targetValue}, ContextualMagnitude=${contextualMagnitude}, Tolerance (Magnitude*0.25)=${dynamicTolerance}`);
+            } else {
+                // Fallback if contextualMagnitude is not available or invalid (e.g. 0, NaN, undefined)
+                dynamicTolerance = 0.01; // Default absolute tolerance for decimals if magnitude is problematic
+                if (this.config.debug) {
+                    console.warn(`Using fallback absolute tolerance (0.01) for decimal question. Target=${targetValue}, ContextualMagnitude=${contextualMagnitude}`);
+                }
+            }
+        } else {
+            // Fallback for unknown question types or if type is missing
+            dynamicTolerance = 0.01; // Default absolute tolerance
+            if (this.config.debug) {
+                console.warn(`Unknown question type or type missing. Using fallback absolute tolerance (0.01). Question:`, this.currentQuestion);
+            }
+        }
+        // Ensure tolerance is a sensible, small, positive number
+        if (!isFinite(dynamicTolerance) || dynamicTolerance <= 0 || dynamicTolerance > 0.5 * Math.abs(targetValue || 1)) {
+            if (this.config.debug) console.warn(`Calculated dynamicTolerance (${dynamicTolerance}) was invalid or too large. Resetting to a small default (0.001).`);
+            dynamicTolerance = 0.001; // A very small, safe default if calculation goes wrong
+        }
+
         const difference = Math.abs(markerValue - targetValue);
-        const isCorrect = difference <= (this.config.answerTolerance || 0.01);
+        const isCorrect = difference <= dynamicTolerance;
 
         let feedbackMessage = '';
         if (isCorrect) {
-            this.score += 10; // Or some scoring logic
+            this.score += 10;
             this.eventBus.emit('UPDATE_SCORE', { newScore: this.score });
             feedbackMessage = 'Correct!';
         } else {
-            // Use toFixed for now, as d3.format is not imported here
-            feedbackMessage = `Not quite. Correct was ${targetValue.toFixed(4)}. You were off by ${difference.toFixed(4)}.`;
+            // Using toFixed for consistent decimal places in feedback for targetValue and difference
+            let targetDisplay = typeof targetValue === 'number' ? targetValue.toFixed(4) : targetValue;
+            let differenceDisplay = typeof difference === 'number' ? difference.toFixed(4) : difference;
+            feedbackMessage = `Not quite. Correct was ${targetDisplay}. You were off by ${differenceDisplay}.`;
+            if (this.config.debug) {
+                let toleranceDisplay = typeof dynamicTolerance === 'number' ? dynamicTolerance.toFixed(5) : dynamicTolerance;
+                feedbackMessage += ` (Tolerance: ±${toleranceDisplay})`;
+            }
         }
+
         this.eventBus.emit('SHOW_FEEDBACK', {
             message: feedbackMessage,
             type: isCorrect ? 'success' : 'error',
-            correctAnswer: targetValue // For NumberlineRenderer to optionally show
+            correctAnswer: targetValue
         });
-        if (this.config.debug) console.log(`Answer checked. Correct: ${isCorrect}, Marker: ${markerValue}, Target: ${targetValue}`);
+
+        if (this.config.debug) {
+            console.log(`Answer checked. Correct: ${isCorrect}, Marker: ${markerValue.toFixed(5)}, Target: ${targetValue.toFixed(5)}, Difference: ${difference.toFixed(5)}, Tolerance: ${dynamicTolerance.toFixed(5)}`);
+        }
     }
 }
