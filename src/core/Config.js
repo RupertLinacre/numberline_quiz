@@ -7,6 +7,7 @@ export const config = {
     debug: true,
     majorTickLength: 20, // Doubled from 10
     minorTickLength: 10,  // Doubled from 5
+    midMinorTickLength: 18, // Length for mid-point minor ticks (e.g., 0.5, 5, 50)
     minZoomScale: 0.01, // Allow more zoom out
     maxZoomScale: 1000, // Allow more zoom in
     answerTolerance: 0.01,

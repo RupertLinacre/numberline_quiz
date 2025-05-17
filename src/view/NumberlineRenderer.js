@@ -303,7 +303,15 @@ export class NumberlineRenderer {
 
             if (iterationStep === majorStep && !isMajor) continue;
 
-            ticks.push({ value: tickValue, isMajor: isMajor });
+            let isMidMinor = false;
+            if (!isMajor && minorStep > 1e-9) {
+                const halfMajorStep = majorStep / 2;
+                if (Math.abs(remainderFromMajor - halfMajorStep) < 1e-9 * majorStep) {
+                    isMidMinor = true;
+                }
+            }
+
+            ticks.push({ value: tickValue, isMajor: isMajor, isMidMinor: isMidMinor });
         }
         return ticks;
     }
@@ -336,7 +344,15 @@ export class NumberlineRenderer {
 
         ticks.append('line')
             .attr('y1', 0)
-            .attr('y2', d => d.isMajor ? (this.config.majorTickLength || 20) : (this.config.minorTickLength || 10));
+            .attr('y2', d => {
+                if (d.isMajor) {
+                    return this.config.majorTickLength || 20;
+                } else if (d.isMidMinor) {
+                    return this.config.midMinorTickLength || 15; // Use new config for mid-minor ticks
+                } else {
+                    return this.config.minorTickLength || 10;
+                }
+            });
         // Stroke color from CSS
 
         ticks.filter(d => d.isMajor)
