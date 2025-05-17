@@ -12,7 +12,7 @@ export const config = {
     answerTolerance: 0.01,
     // For _calculateTickLevels, these might need adjustment based on visual testing
     targetMajorTicksOnScreen: 5,
-    minPixelSeparationForMajor: 40, // Min pixels between major ticks before trying to change step
+    minPixelSeparationForMajor: 200, // Min pixels between major ticks before trying to change step
     majorTickPixelSeparationMultiplier: 3, // Max separation = minPixelSeparationForMajor * this
     maxTicksToGenerate: 300,
 
