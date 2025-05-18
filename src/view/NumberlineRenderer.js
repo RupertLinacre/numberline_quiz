@@ -439,7 +439,7 @@ export class NumberlineRenderer {
             const markerBaseLength = this.config.majorTickLength || 20;
             const markerActualLength = markerBaseLength * markerLineLengthRatio;
 
-            const defaultYRedText = (markerActualLength / 2) + textYOffset;
+            const defaultYRedText = (markerActualLength / 2) + textYOffset * 2;
             let finalYRedText = defaultYRedText;
 
             // Check for horizontal proximity to green text and adjust Y if needed
