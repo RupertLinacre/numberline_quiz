@@ -99,22 +99,39 @@ export class NumberlineRenderer {
         if (this.config.debug) console.log("NumberlineRenderer initialized.");
 
         this.eventBus.on('NEW_QUESTION_READY', (data) => {
+            // --- MODIFICATION START ---
+            // Update QCM and question type *before* calling setDomain,
+            // as setDomain will trigger updateAxis which uses these values.
             if (data.questionData) {
-                this.currentQuestionType = data.questionData.type; // Store the question type
+                this.currentQuestionType = data.questionData.type;
             } else {
-                this.currentQuestionType = null; // Reset if no data
+                this.currentQuestionType = null;
             }
 
             if (data.initialViewParams) {
-                if (data.initialViewParams.domain) {
-                    this.setDomain(data.initialViewParams.domain);
-                }
                 this.questionContextualMagnitude = (data.initialViewParams.questionContextualMagnitude !== undefined)
                     ? data.initialViewParams.questionContextualMagnitude
                     : null;
+
+                // Now that QCM and type are set, update the domain.
+                if (data.initialViewParams.domain) {
+                    this.setDomain(data.initialViewParams.domain);
+                }
+                // If domain wasn't provided but QCM/type changed, a manual updateAxis might be needed here.
+                // However, QuestionFactory currently always provides a domain.
+            } else {
+                // If no initialViewParams, reset QCM (e.g. if transitioning from a question to no question)
+                this.questionContextualMagnitude = null;
+                // If there are no initialViewParams, but question type might have changed,
+                // and if the domain didn't change, we might still want to refresh the axis
+                // if the labeling rules for the existing domain should change.
+                // For now, we assume initialViewParams (and thus domain) are typically present for new questions.
+                // If not, and an update is needed: this.updateAxis(this.currentTransform);
             }
+            // --- MODIFICATION END ---
+
             this._clearCorrectAnswerHighlight();
-            this.resetMarker(); // Reset marker after domain/QCM potentially changes
+            this.resetMarker();
         });
 
         this.eventBus.on('SHOW_FEEDBACK', (data) => {
@@ -424,9 +441,9 @@ export class NumberlineRenderer {
         this.currentTransform = d3.zoomIdentity;
         if (this.svg && this.zoomBehavior) {
             const currentZoomHandler = this.zoomBehavior.on("zoom");
-            this.zoomBehavior.on("zoom", null);
+            this.zoomBehavior.on("zoom", null); // Temporarily disable handler
             this.svg.call(this.zoomBehavior.transform, d3.zoomIdentity);
-            this.zoomBehavior.on("zoom", currentZoomHandler);
+            this.zoomBehavior.on("zoom", currentZoomHandler); // Re-enable handler
         }
         this.updateAxis(this.currentTransform);
         if (this.config.debug) console.log("Numberline domain set to:", newDomain);
