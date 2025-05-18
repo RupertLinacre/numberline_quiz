@@ -112,7 +112,7 @@ export class NumberlineRenderer {
         if (this.config.debug) console.log("NumberlineRenderer initialized.");
 
         this.eventBus.on('NEW_QUESTION_READY', (data) => {
-            this.isFeedbackActive = false;
+            this.isFeedbackActive = false; // Key: Reset for new question, labels will revert
 
             if (data.questionData) {
                 this.currentQuestionType = data.questionData.type;
@@ -138,11 +138,25 @@ export class NumberlineRenderer {
         });
 
         this.eventBus.on('SHOW_FEEDBACK', (data) => {
-            this.isFeedbackActive = true;
-            this.feedbackCorrectValue = data.correctAnswer;
-            this.feedbackUserValue = data.userAnswer;
+            // CRITICAL FIX: Only set isFeedbackActive to true if this is feedback
+            // from an actual answer attempt (which will have 'correctAnswer' defined).
+            // Info messages (like clearing feedback text from loadNextQuestion)
+            // will not have 'correctAnswer' and should not change this flag.
+            if (data.correctAnswer !== undefined) {
+                this.isFeedbackActive = true;
+                this.feedbackCorrectValue = data.correctAnswer;
+                this.feedbackUserValue = data.userAnswer;
+            } else {
+                // If it's an info message without a correctAnswer,
+                // ensure feedback visuals reflect no specific answer.
+                this.feedbackCorrectValue = null;
+                this.feedbackUserValue = null;
+                // isFeedbackActive remains as it was (it would be false if coming from NEW_QUESTION_READY)
+            }
 
-            this.updateAxis(this.currentTransform);
+            this.updateAxis(this.currentTransform); // Redraw.
+            // _shouldShowMajorTickLabel and _renderFeedbackVisuals
+            // will use the current state of isFeedbackActive.
         });
     }
 
@@ -333,16 +347,16 @@ export class NumberlineRenderer {
 
     /**
      * Determines if a major tick label should be shown based on the current question
-     * type and contextual magnitude.
-     * This method DOES NOT yet consider the isFeedbackActive state for forcing labels.
-     * That will be added when the feature itself is implemented.
+     * type, contextual magnitude, and whether feedback is active.
      * @param {number} tickDataValue - The numerical value of the tick.
      * @returns {boolean} - True if the label should be shown, false otherwise.
      */
     _shouldShowMajorTickLabel(tickDataValue) {
-        // When the "show all labels on feedback" feature is implemented,
-        // the first check here will be:
-        // if (this.isFeedbackActive) { return true; }
+        // If feedback is active, always show all major tick labels,
+        // similar to how fraction questions behave during question phase.
+        if (this.isFeedbackActive) {
+            return true;
+        }
 
         // For fraction questions, always show major tick labels.
         if (this.currentQuestionType === 'fraction') {
@@ -351,39 +365,23 @@ export class NumberlineRenderer {
 
         // For decimal questions, apply suppression logic.
         if (this.currentQuestionType === 'decimal') {
-            // If no specific contextual magnitude is provided, or it's extremely small,
-            // show all major labels for decimals.
             if (this.questionContextualMagnitude === null || this.questionContextualMagnitude <= 1e-9) {
                 return true;
             }
-
-            // Always show the label for the value 0.
-            if (Math.abs(tickDataValue) < 1e-12) { // Using a small epsilon for 0 check
+            if (Math.abs(tickDataValue) < 1e-12) {
                 return true;
             }
-
             const allowedLabelingMagnitude = this.questionContextualMagnitude * 10;
-            // If the determined allowed labeling magnitude is effectively zero,
-            // it implies we should show the label. This can happen if questionContextualMagnitude
-            // is very small but not caught by the earlier check (e.g. 1e-10).
             if (Math.abs(allowedLabelingMagnitude) < 1e-12) {
                 return true;
             }
-
-            // Main decimal suppression logic: show if tickDataValue is an integer multiple
-            // of allowedLabelingMagnitude.
             const ratio = tickDataValue / allowedLabelingMagnitude;
             if (Math.abs(ratio - Math.round(ratio)) < 1e-9) {
                 return true;
             }
-
-            // If none of the above conditions for showing a decimal label are met, suppress it.
             return false;
         }
-
-        // Default for unknown or other question types: show all major labels.
-        // This ensures that if currentQuestionType is not 'fraction' or 'decimal', labels are shown.
-        return true;
+        return true; // Default for unknown/other types
     }
 
     updateAxis(transform) {
@@ -419,7 +417,7 @@ export class NumberlineRenderer {
             });
 
         ticks.filter(d => d.isMajor)
-            .filter(d => this._shouldShowMajorTickLabel(d.value)) // Use the new helper method
+            .filter(d => this._shouldShowMajorTickLabel(d.value))
             .append('text')
             .attr('y', (this.config.majorTickLength || 20) + ((this.config.labelFontSizePx || 20) * 0.8))
             .attr('text-anchor', 'middle')
@@ -434,6 +432,7 @@ export class NumberlineRenderer {
         const labelFontSize = this.config.labelFontSizePx || 20;
         const textYOffset = labelFontSize * 1.5;
 
+        // This check is now very important: only proceed if feedback is truly active AND we have a correct value.
         if (!this.isFeedbackActive || this.feedbackCorrectValue === null) {
             this.feedbackCorrectGroup.style('visibility', 'hidden');
             this.feedbackUserGroup.style('visibility', 'hidden');
@@ -465,7 +464,7 @@ export class NumberlineRenderer {
             .text(formatNumber(this.feedbackCorrectValue))
             .style('font-size', `${labelFontSize}px`);
 
-        if (this.feedbackUserValue !== null) {
+        if (this.feedbackUserValue !== null) { // User value is only present if answer was incorrect
             this.feedbackUserGroup.style('visibility', 'visible');
             const xUser = currentScale(this.feedbackUserValue);
             if (!isFinite(xUser) || isNaN(xUser)) {
