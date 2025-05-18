@@ -15,33 +15,56 @@ export class NumberlineRenderer {
         this.marker = null;
         this.markerDataValue = null;
 
-        this.currentQuestionType = null; // To store the type of the current question
+        this.currentQuestionType = null;
         this.questionContextualMagnitude = null;
-        this.correctAnswerHighlightValue = null;
 
-        // Store dynamic dimensions
+        // New state for feedback visuals
+        this.isFeedbackActive = false;
+        this.feedbackCorrectValue = null;
+        this.feedbackUserValue = null; // Will store user's answer if incorrect
+
+        // Groups for feedback elements
+        this.feedbackCorrectGroup = null;
+        this.feedbackUserGroup = null;
+
         this.effectiveSvgWidth = 0;
         this.chartWidth = 0;
     }
 
     init() {
         this.svg = d3.select(`#${this.svgId}`)
-            .attr('height', this.config.svgHeight); // Width is 100% via CSS
+            .attr('height', this.config.svgHeight);
 
         this.chartArea = this.svg.append('g');
-        // Initial transform will be set in _updateDimensionsAndScales
 
         this.baseScale = d3.scaleLinear()
             .domain(this.config.initialDomain);
-        // Range will be set in _updateDimensionsAndScales
 
         this.chartArea.append('line')
             .attr('class', 'axis-line')
-            .attr('y1', 0) // Positioned at the G's origin
+            .attr('y1', 0)
             .attr('y2', 0);
-        // x1 and x2 will be set in _updateDimensionsAndScales
 
-        this._updateDimensionsAndScales(); // Initial setup of dimensions, scales, and background rect
+        this._updateDimensionsAndScales();
+
+        // Initialize feedback groups (before marker, so marker is on top if overlapping)
+        this.feedbackCorrectGroup = this.chartArea.append('g')
+            .attr('class', 'feedback-correct-answer-group')
+            .style('visibility', 'hidden');
+        this.feedbackCorrectGroup.append('line')
+            .attr('class', 'feedback-line-correct'); // Styled by CSS
+        this.feedbackCorrectGroup.append('text')
+            .attr('class', 'feedback-text-correct') // Styled by CSS
+            .attr('text-anchor', 'middle');
+
+        this.feedbackUserGroup = this.chartArea.append('g')
+            .attr('class', 'feedback-user-answer-group')
+            .style('visibility', 'hidden');
+        // No line for user answer, text is relative to the draggable marker
+        this.feedbackUserGroup.append('text')
+            .attr('class', 'feedback-text-user') // Styled by CSS
+            .attr('text-anchor', 'middle');
+
 
         this.zoomBehavior = d3.zoom()
             .scaleExtent([
@@ -61,14 +84,9 @@ export class NumberlineRenderer {
         this._initMarker();
 
         this.chartArea.on('click', (event) => {
-            if (event.defaultPrevented) {
-                if (this.config.debug) console.log("ChartArea click event defaultPrevented, likely handled by zoom/pan.");
-                return;
-            }
-            if (this.chartWidth <= 0) {
-                if (this.config.debug) console.warn("ChartArea click ignored, chartWidth is not positive.");
-                return;
-            }
+            if (event.defaultPrevented) return;
+            if (this.chartWidth <= 0) return;
+
             let target = event.target;
             let isMarkerOrChildClick = false;
             if (this.marker) {
@@ -81,10 +99,8 @@ export class NumberlineRenderer {
                     target = target.parentNode;
                 }
             }
-            if (isMarkerOrChildClick) {
-                if (this.config.debug) console.log("ChartArea click was on marker or its child, ignoring in favor of marker's own handlers.");
-                return;
-            }
+            if (isMarkerOrChildClick) return;
+
             const currentScale = this.currentTransform.rescaleX(this.baseScale);
             const [xPositionInChartArea] = d3.pointer(event, this.chartArea.node());
             this.markerDataValue = currentScale.invert(xPositionInChartArea);
@@ -99,9 +115,8 @@ export class NumberlineRenderer {
         if (this.config.debug) console.log("NumberlineRenderer initialized.");
 
         this.eventBus.on('NEW_QUESTION_READY', (data) => {
-            // --- MODIFICATION START ---
-            // Update QCM and question type *before* calling setDomain,
-            // as setDomain will trigger updateAxis which uses these values.
+            this.isFeedbackActive = false; // Hide feedback for new question
+
             if (data.questionData) {
                 this.currentQuestionType = data.questionData.type;
             } else {
@@ -112,33 +127,27 @@ export class NumberlineRenderer {
                 this.questionContextualMagnitude = (data.initialViewParams.questionContextualMagnitude !== undefined)
                     ? data.initialViewParams.questionContextualMagnitude
                     : null;
-
-                // Now that QCM and type are set, update the domain.
                 if (data.initialViewParams.domain) {
                     this.setDomain(data.initialViewParams.domain);
                 }
-                // If domain wasn't provided but QCM/type changed, a manual updateAxis might be needed here.
-                // However, QuestionFactory currently always provides a domain.
             } else {
-                // If no initialViewParams, reset QCM (e.g. if transitioning from a question to no question)
                 this.questionContextualMagnitude = null;
-                // If there are no initialViewParams, but question type might have changed,
-                // and if the domain didn't change, we might still want to refresh the axis
-                // if the labeling rules for the existing domain should change.
-                // For now, we assume initialViewParams (and thus domain) are typically present for new questions.
-                // If not, and an update is needed: this.updateAxis(this.currentTransform);
             }
-            // --- MODIFICATION END ---
 
-            this._clearCorrectAnswerHighlight();
             this.resetMarker();
+            // updateAxis will be called by setDomain or resetMarker, which will hide feedback
+            // If setDomain wasn't called, explicitly call updateAxis if necessary
+            if (!(data.initialViewParams && data.initialViewParams.domain)) {
+                this.updateAxis(this.currentTransform);
+            }
         });
 
         this.eventBus.on('SHOW_FEEDBACK', (data) => {
-            this._clearCorrectAnswerHighlight();
-            if (data.correctAnswer !== undefined && data.type === 'error') {
-                this._setCorrectAnswerHighlightValue(data.correctAnswer);
-            }
+            this.isFeedbackActive = true;
+            this.feedbackCorrectValue = data.correctAnswer;
+            this.feedbackUserValue = data.userAnswer; // Will be null if answer was correct
+
+            this.updateAxis(this.currentTransform); // Redraw to show feedback
         });
     }
 
@@ -186,8 +195,8 @@ export class NumberlineRenderer {
     handleResize() {
         if (this.config.debug) console.log("Handling resize...");
         this._updateDimensionsAndScales();
-        this.updateAxis(this.currentTransform); // Redraw axis with new dimensions
-        this._updateMarkerScreenPosition(); // Ensure marker is correctly positioned
+        this.updateAxis(this.currentTransform);
+        this._updateMarkerScreenPosition();
     }
 
     _initMarker() {
@@ -213,12 +222,8 @@ export class NumberlineRenderer {
             .style('cursor', 'ew-resize');
         const dragBehavior = d3.drag()
             .on('start', (event) => {
-                if (event && event.sourceEvent) {
-                    event.sourceEvent.stopPropagation();
-                }
-                if (this.chartWidth <= 0) {
-                    if (this.config.debug) console.warn("Marker drag started with non-positive chartWidth.");
-                }
+                if (event && event.sourceEvent) event.sourceEvent.stopPropagation();
+                if (this.chartWidth <= 0) if (this.config.debug) console.warn("Marker drag started with non-positive chartWidth.");
             })
             .on('drag', (event) => {
                 if (this.chartWidth <= 0) return;
@@ -227,7 +232,7 @@ export class NumberlineRenderer {
                 this._updateMarkerScreenPosition();
                 this.eventBus.emit('MARKER_DRAGGED', { currentValue: this.markerDataValue });
             })
-            .on('end', (event) => {
+            .on('end', () => {
                 if (this.chartWidth <= 0) return;
                 this.eventBus.emit('MARKER_VALUE_FINALIZED', { value: this.markerDataValue });
             });
@@ -240,7 +245,7 @@ export class NumberlineRenderer {
         const currentScale = this.currentTransform.rescaleX(this.baseScale);
         const xPosition = currentScale(this.markerDataValue);
         if (!isFinite(xPosition) || isNaN(xPosition)) {
-            if (this.config.debug) console.warn("Marker screen position is not finite/NaN for value:", this.markerDataValue, "Scale domain:", currentScale.domain(), "Scale range:", currentScale.range());
+            if (this.config.debug) console.warn("Marker screen position is not finite/NaN for value:", this.markerDataValue);
             return;
         }
         this.marker.attr('transform', `translate(${xPosition}, 0)`);
@@ -252,7 +257,6 @@ export class NumberlineRenderer {
         const currentChartWidth = this.chartWidth;
 
         if (domainWidth <= 1e-12 || !isFinite(domainWidth) || isNaN(domainWidth) || currentChartWidth <= 0) {
-            if (this.config.debug && currentChartWidth <= 0) console.warn("_calculateTickLevels: chartWidth is not positive.", currentChartWidth);
             return [];
         }
 
@@ -271,8 +275,7 @@ export class NumberlineRenderer {
             if (majorStep <= 1e-12 || !isFinite(majorStep) || isNaN(majorStep)) majorStep = 1;
         }
 
-        let iterations = 0;
-        const MAX_ITERATIONS = 15;
+        let iterations = 0; const MAX_ITERATIONS = 15;
         let pixelsPerMajorStep = majorStep * (currentChartWidth / domainWidth);
         while (iterations < MAX_ITERATIONS && pixelsPerMajorStep < minPixelSeparationForMajor && majorStep * 10 < domainWidth * 1e5) {
             majorStep *= 10;
@@ -291,10 +294,7 @@ export class NumberlineRenderer {
             if (majorStep <= 1e-12 || !isFinite(majorStep) || isNaN(majorStep)) break;
         }
 
-        if (majorStep <= 1e-12 || !isFinite(majorStep) || isNaN(majorStep)) {
-            if (this.config.debug) console.warn("Major step calculation resulted in invalid value, returning empty ticks.", majorStep);
-            return [];
-        }
+        if (majorStep <= 1e-12 || !isFinite(majorStep) || isNaN(majorStep)) return [];
 
         const minorStep = majorStep / 10;
         const ticks = [];
@@ -316,9 +316,7 @@ export class NumberlineRenderer {
         const numPredictedTicks = (endValue - startValue) / iterationStep;
         if (numPredictedTicks > MAX_TICKS_TO_GENERATE * 2 && iterationStep > 1e-9 && iterationStep !== majorStep) {
             iterationStep = majorStep;
-            if ((endValue - startValue) / iterationStep > MAX_TICKS_TO_GENERATE * 2) {
-                return [];
-            }
+            if ((endValue - startValue) / iterationStep > MAX_TICKS_TO_GENERATE * 2) return [];
         }
 
         for (let v = startValue; v <= endValue + 1e-9; v += iterationStep) {
@@ -342,7 +340,7 @@ export class NumberlineRenderer {
         if (this.chartWidth <= 0) {
             this._updateDimensionsAndScales();
             if (this.chartWidth <= 0) {
-                if (this.config.debug) console.error("updateAxis aborted: chartWidth is still not positive after _updateDimensionsAndScales.");
+                if (this.config.debug) console.error("updateAxis aborted: chartWidth is still not positive.");
                 return;
             }
         }
@@ -372,33 +370,13 @@ export class NumberlineRenderer {
 
         ticks.filter(d => d.isMajor)
             .filter(d => {
-                // Rule 1: For fraction questions, always show all major tick labels
-                if (this.currentQuestionType === 'fraction') {
-                    return true;
-                }
-
-                // Rule 2: For decimal questions (or if type is unknown/null), apply QCM-based filter
-                // If QCM implies no restriction (null or very small), show the label.
-                if (this.questionContextualMagnitude === null || this.questionContextualMagnitude <= 1e-9) {
-                    return true;
-                }
-
+                if (this.currentQuestionType === 'fraction') return true;
+                if (this.questionContextualMagnitude === null || this.questionContextualMagnitude <= 1e-9) return true;
                 const allowedLabelingMagnitude = this.questionContextualMagnitude * 10;
-
-                // If allowedLabelingMagnitude is effectively zero, it means QCM was extremely small,
-                // so we shouldn't filter (already covered by QCM <= 1e-9, but good safeguard).
-                if (Math.abs(allowedLabelingMagnitude) < 1e-12) { // Use a very small epsilon
-                    return true;
-                }
-
-                // If the tick value itself is (close to) zero, always show its label.
-                if (Math.abs(d.value) < 1e-12) { // Use a very small epsilon
-                    return true;
-                }
-
-                // Check if d.value is an integer multiple of allowedLabelingMagnitude
+                if (Math.abs(allowedLabelingMagnitude) < 1e-12) return true;
+                if (Math.abs(d.value) < 1e-12) return true;
                 const ratio = d.value / allowedLabelingMagnitude;
-                return Math.abs(ratio - Math.round(ratio)) < 1e-9; // Epsilon for "is multiple of" check
+                return Math.abs(ratio - Math.round(ratio)) < 1e-9;
             })
             .append('text')
             .attr('y', (this.config.majorTickLength || 20) + ((this.config.labelFontSizePx || 20) * 0.8))
@@ -407,27 +385,79 @@ export class NumberlineRenderer {
             .text(d => formatNumber(d.value));
 
         this._updateMarkerScreenPosition();
-        this.chartArea.selectAll('.correct-answer-highlight').remove();
-        if (this.correctAnswerHighlightValue !== null) {
-            const xPosition = currentScale(this.correctAnswerHighlightValue);
-            if (isFinite(xPosition) && !isNaN(xPosition)) {
-                const hlConfig = this.config.correctAnswerHighlightConfig || {};
-                const highlightLengthRatio = hlConfig.lengthToMajorTickRatio || 1.8;
-                const highlightBaseLength = this.config.majorTickLength || 20;
-                const highlightLength = highlightBaseLength * highlightLengthRatio;
-                const highlightStrokeWidth = hlConfig.strokeWidth || 6;
-                this.chartArea.append('line')
-                    .attr('class', 'correct-answer-highlight')
-                    .attr('x1', xPosition)
-                    .attr('x2', xPosition)
-                    .attr('y1', -highlightLength / 2)
-                    .attr('y2', highlightLength / 2)
-                    .attr('stroke-width', highlightStrokeWidth);
+        this._renderFeedbackVisuals(currentScale); // New call to render feedback
+    }
+
+    _renderFeedbackVisuals(currentScale) {
+        const labelFontSize = this.config.labelFontSizePx || 20;
+        const textYOffset = labelFontSize * 1.2; // Standard offset below a line/marker
+
+        if (!this.isFeedbackActive || this.feedbackCorrectValue === null) {
+            this.feedbackCorrectGroup.style('visibility', 'hidden');
+            this.feedbackUserGroup.style('visibility', 'hidden');
+            return;
+        }
+
+        // --- Correct Answer Visuals (Green Line and Text) ---
+        this.feedbackCorrectGroup.style('visibility', 'visible');
+        const xCorrect = currentScale(this.feedbackCorrectValue);
+        if (!isFinite(xCorrect) || isNaN(xCorrect)) {
+            this.feedbackCorrectGroup.style('visibility', 'hidden');
+        } else {
+            this.feedbackCorrectGroup.attr('transform', `translate(${xCorrect}, 0)`);
+        }
+
+        const hlConfig = this.config.correctAnswerHighlightConfig || {};
+        const highlightLengthRatio = hlConfig.lengthToMajorTickRatio || 1.8;
+        const highlightBaseLength = this.config.majorTickLength || 20;
+        const highlightActualLength = highlightBaseLength * highlightLengthRatio;
+        const highlightStrokeWidth = hlConfig.strokeWidth || 3;
+
+        this.feedbackCorrectGroup.select('line')
+            .attr('y1', -highlightActualLength / 2)
+            .attr('y2', highlightActualLength / 2)
+            .attr('stroke-width', highlightStrokeWidth);
+
+        const yGreenText = (highlightActualLength / 2) + textYOffset;
+        this.feedbackCorrectGroup.select('text')
+            .attr('y', yGreenText)
+            .text(formatNumber(this.feedbackCorrectValue))
+            .style('font-size', `${labelFontSize}px`);
+
+        // --- User Answer Visuals (Red Text, if incorrect) ---
+        if (this.feedbackUserValue !== null) {
+            this.feedbackUserGroup.style('visibility', 'visible');
+            const xUser = currentScale(this.feedbackUserValue);
+            if (!isFinite(xUser) || isNaN(xUser)) {
+                this.feedbackUserGroup.style('visibility', 'hidden');
             } else {
-                if (this.config.debug) console.warn("Cannot draw correct answer highlight, position not finite/NaN for value:", this.correctAnswerHighlightValue);
+                this.feedbackUserGroup.attr('transform', `translate(${xUser}, 0)`);
             }
+
+            const markerConfig = this.config.markerConfig || {};
+            const markerLineLengthRatio = markerConfig.lineWidthToMajorTickRatio || 1.5;
+            const markerBaseLength = this.config.majorTickLength || 20;
+            const markerActualLength = markerBaseLength * markerLineLengthRatio;
+
+            const defaultYRedText = (markerActualLength / 2) + textYOffset;
+            let finalYRedText = defaultYRedText;
+
+            // Check for horizontal proximity to green text and adjust Y if needed
+            const horizontalProximityThreshold = labelFontSize * 3; // Approx 3 characters wide
+            if (isFinite(xUser) && isFinite(xCorrect) && Math.abs(xUser - xCorrect) < horizontalProximityThreshold) {
+                const minYRedText = yGreenText + labelFontSize + (labelFontSize * 0.3); // Green text Y + 1 font height + padding
+                finalYRedText = Math.max(defaultYRedText, minYRedText);
+            }
+
+            this.feedbackUserGroup.select('text')
+                .attr('y', finalYRedText)
+                .text(formatNumber(this.feedbackUserValue))
+                .style('font-size', `${labelFontSize}px`);
+        } else {
+            this.feedbackUserGroup.style('visibility', 'hidden');
         }
     }
+
 
     setDomain(newDomain) {
         if (this.chartWidth <= 0) {
@@ -441,9 +471,9 @@ export class NumberlineRenderer {
         this.currentTransform = d3.zoomIdentity;
         if (this.svg && this.zoomBehavior) {
             const currentZoomHandler = this.zoomBehavior.on("zoom");
-            this.zoomBehavior.on("zoom", null); // Temporarily disable handler
+            this.zoomBehavior.on("zoom", null);
             this.svg.call(this.zoomBehavior.transform, d3.zoomIdentity);
-            this.zoomBehavior.on("zoom", currentZoomHandler); // Re-enable handler
+            this.zoomBehavior.on("zoom", currentZoomHandler);
         }
         this.updateAxis(this.currentTransform);
         if (this.config.debug) console.log("Numberline domain set to:", newDomain);
@@ -476,26 +506,13 @@ export class NumberlineRenderer {
                     this.markerDataValue = 0.5;
                     if (this.config.debug) console.warn("Marker reset to absolute fallback due to invalid domains.");
                 }
-                if (this.config.debug && (!(domain && domain.length === 2 && isFinite(domain[0]) && isFinite(domain[1]) && domain[1] > domain[0]))) {
-                    console.warn("Marker reset to baseScale domain center due to invalid currentScale domain:", domain);
-                }
             }
         }
         this._updateMarkerScreenPosition();
         if (this.config.debug) console.log("Marker reset to:", this.markerDataValue);
-    }
-
-    _setCorrectAnswerHighlightValue(value) {
-        this.correctAnswerHighlightValue = value;
-        if (this.chartWidth > 0) this.updateAxis(this.currentTransform);
-    }
-
-    _clearCorrectAnswerHighlight() {
-        if (this.correctAnswerHighlightValue !== null) {
-            this.correctAnswerHighlightValue = null;
-            if (this.chartWidth > 0) this.updateAxis(this.currentTransform);
-        } else {
-            if (this.chartArea) this.chartArea.selectAll('.correct-answer-highlight').remove();
+        // Call updateAxis if marker reset might affect visual elements tied to feedback state
+        if (this.isFeedbackActive) {
+            this.updateAxis(this.currentTransform);
         }
     }
 }

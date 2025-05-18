@@ -179,3 +179,69 @@ button:focus-visible {
         stroke: #81c784;
     }
 }
+/* ... (your existing styles) ... */
+
+/* Ensure tick text is visible in both light and dark modes */
+.tick text {
+  fill: currentColor;
+}
+
+.tick.major line {
+  stroke: #333;
+}
+.tick.minor line {
+  stroke: #aaa;
+}
+@media (prefers-color-scheme: dark) {
+  .tick.major line {
+    stroke: #ccc;
+  }
+  .tick.minor line {
+    stroke: #666;
+  }
+}
+.axis-line {
+  stroke: #333;
+}
+@media (prefers-color-scheme: dark) {
+  .axis-line {
+    stroke: #ccc;
+  }
+}
+
+.draggable-marker line, .draggable-marker circle {
+    stroke: #d9534f; /* A reddish color for the draggable marker */
+    fill: #d9534f;
+}
+@media (prefers-color-scheme: dark) {
+    .draggable-marker line, .draggable-marker circle {
+        stroke: #e57373;
+        fill: #e57373;
+    }
+}
+
+/* Styles for feedback visuals */
+.feedback-line-correct {
+    stroke: #5cb85c; /* Green */
+    /* stroke-width will be set by JS from config */
+}
+.feedback-text-correct {
+    fill: #5cb85c; /* Green */
+    /* font-size will be set by JS from config */
+}
+.feedback-text-user {
+    fill: #d9534f; /* Red */
+    /* font-size will be set by JS from config */
+}
+
+@media (prefers-color-scheme: dark) {
+    .feedback-line-correct {
+        stroke: #81c784; /* Lighter green for dark mode */
+    }
+    .feedback-text-correct {
+        fill: #81c784;
+    }
+    .feedback-text-user {
+        fill: #e57373; /* Lighter red for dark mode */
+    }
+}
