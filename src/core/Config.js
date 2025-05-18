@@ -1,7 +1,7 @@
 export const config = {
     // svgWidth: 800, // This will now be dynamically determined.
     // It can be kept as a fallback or initial reference if needed.
-    svgHeight: 400,   // Doubled from 200
+    svgHeight: 200,   // Doubled from 200
     margins: { top: 50, right: 20, bottom: 70, left: 20 }, // Adjusted margins for smaller screens
     initialDomain: [0, 2],
     debug: true,
