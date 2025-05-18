@@ -12,8 +12,8 @@ export const config = {
     maxZoomScale: 1000, // Allow more zoom in
 
     // For _calculateTickLevels, these might need adjustment based on visual testing
-    targetMajorTicksOnScreen: 5,
-    minPixelSeparationForMajor: 200, // Min pixels between major ticks before trying to change step
+    targetMajorTicksOnScreen: 4,
+    minPixelSeparationForMajor: 150, // Min pixels between major ticks before trying to change step
     majorTickPixelSeparationMultiplier: 3, // Max separation = minPixelSeparationForMajor * this
     maxTicksToGenerate: 300,
 
