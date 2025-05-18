@@ -1,86 +1,115 @@
 // src/game/QuestionFactory.js
 import { getDecimalPrecision } from '../utils/formatter.js';
 
+const epsilon = 1e-9; // For floating point comparisons
+
+function isEffectivelyInteger(value) {
+    return Math.abs(value - Math.round(value)) < epsilon;
+}
+
 /**
- * Calculates the standard domain for a question value based on the rule:
- * min = floor(value) - 0.2
- * max = ceil(value) + 0.2
+ * Calculates the standard domain for a question value.
  * @param {number} value - The target value for the question.
  * @returns {[number, number]} - The [min, max] for the domain.
  */
 function calculateStandardQuestionDomain(value) {
-    const epsilon = 1e-9; // Tolerance for floating point comparisons
-
     let representativeValue = value;
-    // If value is very close to an integer, treat it as that integer for consistent floor/ceil.
-    if (Math.abs(value - Math.round(value)) < epsilon) {
+    if (isEffectivelyInteger(value)) {
         representativeValue = Math.round(value);
     }
 
     const floorVal = Math.floor(representativeValue);
     const ceilVal = Math.ceil(representativeValue);
 
-    let domainMin = floorVal - 0.1;
-    let domainMax = ceilVal + 0.1;
+    // Give a bit more room based on absolute value, or at least a fixed amount
+    const padding = Math.max(0.2, Math.abs(representativeValue * 0.1));
 
-    // Ensure domainMin is strictly less than domainMax.
-    // This should generally hold with positive padding.
-    // If floorVal and ceilVal are the same (value is an integer like 3),
-    // domainMin = 3 - 0.2 = 2.8
-    // domainMax = 3 + 0.2 = 3.2
-    // which is correct.
-    // This safeguard ensures a minimum span if something unexpected happens.
-    if (domainMax <= domainMin + epsilon) {
-        domainMax = domainMin + 0.4; // Ensure a minimal span of 0.4
+    let domainMin = floorVal - padding;
+    let domainMax = ceilVal + padding;
+
+    // Ensure a minimum span, e.g., 0.5 or 1.0
+    const minSpan = 1.0;
+    if (domainMax - domainMin < minSpan) {
+        const mid = (domainMin + domainMax) / 2;
+        domainMin = mid - minSpan / 2;
+        domainMax = mid + minSpan / 2;
     }
+
+    // For values near zero, ensure a symmetric domain if padding was small
+    if (Math.abs(value) < 0.5 && padding < 0.4) {
+        domainMin = Math.min(domainMin, -0.5);
+        domainMax = Math.max(domainMax, 0.5);
+    }
+
 
     return [domainMin, domainMax];
 }
 
-/**
- * Generates a decimal-based question.
- * @param {object} config - The global application config.
- * @param {string} difficulty - 'easy', 'medium', or 'hard'.
- * @returns {object} - The question object.
- */
+
 function generateDecimalQuestion(config, difficulty = 'medium') {
-    let numDecimalPlaces;
-    let valueRangeMagnitude; // Power of 10 for the range (e.g., 0 for 0-1, 1 for 0-10)
+    let value;
+    let dp;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 50;
 
     switch (difficulty) {
         case 'easy':
-            numDecimalPlaces = 1;
-            valueRangeMagnitude = (Math.random() < 0.7) ? 0 : 1;
-            break;
-        case 'hard':
-            numDecimalPlaces = Math.floor(Math.random() * 2) + 2; // 2 or 3 decimal places
-            valueRangeMagnitude = (Math.random() < 0.3) ? 0 : (Math.random() < 0.7 ? 1 : 2);
+            dp = 1;
+            do {
+                const intPart = Math.floor(Math.random() * 4); // 0, 1, 2, 3
+                const decPart = (Math.floor(Math.random() * 9) + 1) / 10.0; // .1 to .9
+                value = parseFloat((intPart + decPart).toFixed(dp));
+                attempts++;
+            } while ((isEffectivelyInteger(value) || value <= 0 || value >= 4) && attempts < MAX_ATTEMPTS);
+            if (attempts >= MAX_ATTEMPTS && (isEffectivelyInteger(value) || value <= 0 || value >= 4)) { // Fallback
+                value = Math.random() < 0.5 ? 0.7 : 1.3; // A simple non-integer in range
+            }
             break;
         case 'medium':
-        default:
-            numDecimalPlaces = Math.floor(Math.random() * 2) + 1;
-            valueRangeMagnitude = (Math.random() < 0.5) ? 0 : 1;
+            dp = Math.random() < 0.5 ? 1 : 2;
+            do {
+                const intPart = Math.floor(Math.random() * 4); // 0, 1, 2, 3
+                let decPart;
+                if (dp === 1) {
+                    decPart = (Math.floor(Math.random() * 9) + 1) / 10.0;
+                } else {
+                    decPart = (Math.floor(Math.random() * 99) + 1) / 100.0;
+                }
+                value = parseFloat((intPart + decPart).toFixed(dp));
+                attempts++;
+            } while ((isEffectivelyInteger(value) || value <= 0 || value >= 4) && attempts < MAX_ATTEMPTS);
+            if (attempts >= MAX_ATTEMPTS && (isEffectivelyInteger(value) || value <= 0 || value >= 4)) {
+                value = Math.random() < 0.5 ? 0.65 : 2.35;
+            }
             break;
-    }
+        case 'hard':
+            dp = Math.random() < 0.5 ? 1 : 2;
+            do {
+                const absIntPart = Math.floor(Math.random() * 4); // 0, 1, 2, 3 for absolute
+                let absDecPart;
+                if (dp === 1) {
+                    absDecPart = (Math.floor(Math.random() * 9) + 1) / 10.0;
+                } else {
+                    absDecPart = (Math.floor(Math.random() * 99) + 1) / 100.0;
+                }
+                let absValue = parseFloat((absIntPart + absDecPart).toFixed(dp));
 
-    const baseValueRange = Math.pow(10, valueRangeMagnitude);
-    let value = (Math.random() * baseValueRange);
+                if (absValue >= 4.0) absValue = parseFloat((3 + absDecPart).toFixed(dp)); // Cap abs value if it goes too high
 
-    if (Math.random() < 0.25) {
-        if (!(difficulty === 'easy' && valueRangeMagnitude === 0)) {
-            value *= -1;
-        }
-    }
-    value = parseFloat(value.toFixed(numDecimalPlaces));
-
-    if (value === 0 && numDecimalPlaces > 0) {
-        const randomSmallOffset = (Math.random() * 0.5 + 0.1) * Math.pow(10, -numDecimalPlaces);
-        value = parseFloat(randomSmallOffset.toFixed(numDecimalPlaces)) * (Math.random() < 0.5 ? 1 : -1);
-        if (value === 0) value = Math.pow(10, -numDecimalPlaces);
+                value = absValue * (Math.random() < 0.5 ? 1 : -1);
+                value = parseFloat(value.toFixed(dp)); // ensure sign and dp
+                attempts++;
+            } while ((isEffectivelyInteger(value) || Math.abs(value) >= 4 || value === 0.0) && attempts < MAX_ATTEMPTS);
+            if (attempts >= MAX_ATTEMPTS && (isEffectivelyInteger(value) || Math.abs(value) >= 4 || value === 0.0)) {
+                value = (Math.random() < 0.5 ? -1.75 : 2.15);
+            }
+            break;
+        default: // Fallback to medium
+            return generateDecimalQuestion(config, 'medium');
     }
 
     const contextualMagnitude = getDecimalPrecision(value);
-    const domain = calculateStandardQuestionDomain(value); // Use new domain logic
+    const domain = calculateStandardQuestionDomain(value);
 
     return {
         type: 'decimal',
@@ -93,54 +122,84 @@ function generateDecimalQuestion(config, difficulty = 'medium') {
     };
 }
 
-/**
- * Generates a fraction-based question.
- * @param {object} config - The global application config.
- * @param {string} difficulty - 'easy', 'medium', or 'hard'.
- * @returns {object} - The question object.
- */
 function generateFractionQuestion(config, difficulty = 'medium') {
-    let fractionsPool;
-    const easyFrac = [{ n: 1, d: 2 }, { n: 1, d: 3 }, { n: 2, d: 3 }, { n: 1, d: 4 }, { n: 3, d: 4 }, { n: 2, d: 2 }, { n: 3, d: 3 }]; // Added integers
-    const mediumFrac = [
-        ...easyFrac,
-        { n: 1, d: 5 }, { n: 2, d: 5 }, { n: 3, d: 5 }, { n: 4, d: 5 }, { n: 1, d: 6 }, { n: 5, d: 6 },
-        { n: 1, d: 8 }, { n: 3, d: 8 }, { n: 5, d: 8 }, { n: 7, d: 8 }, { n: 1, d: 10 }, { n: 3, d: 10 }, { n: 7, d: 10 }, { n: 9, d: 10 },
-        { n: 4, d: 4 }, { n: 5, d: 5 }, { n: 6, d: 2 }, { n: 9, d: 3 } // More integers/reducible
-    ];
-    const hardFrac = [
-        ...mediumFrac,
-        { n: 1, d: 12 }, { n: 5, d: 12 }, { n: 7, d: 12 }, { n: 11, d: 12 }, { n: 2, d: 4 }, { n: 2, d: 6 }, { n: 4, d: 6 }, { n: 6, d: 8 },
-        // {n:5,d:4},{n:3,d:2},{n:7,d:5} // Consider if improper fractions are desired for "hard"
-    ];
+    let validFractions = [];
+    let denominators;
+    let valueRangePositive = [0, 1]; // Default for easy/medium: (0, 1) exclusive of ends
 
     switch (difficulty) {
-        case 'easy': fractionsPool = easyFrac; break;
-        case 'hard': fractionsPool = hardFrac; break;
-        case 'medium': default: fractionsPool = mediumFrac; break;
+        case 'easy':
+            denominators = [2, 5, 10];
+            for (const d of denominators) {
+                for (let n = 1; n < d; n++) {
+                    if ((n / d) % 1 !== 0) { // Value is not an integer
+                        validFractions.push({ num: n, den: d, display: `${n}/${d}` });
+                    }
+                }
+            }
+            break;
+        case 'medium':
+            denominators = [2, 3, 4, 5, 10];
+            for (const d of denominators) {
+                for (let n = 1; n < d; n++) {
+                    if ((n / d) % 1 !== 0) {
+                        validFractions.push({ num: n, den: d, display: `${n}/${d}` });
+                    }
+                }
+            }
+            break;
+        case 'hard':
+            denominators = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+            // Value range for hard: (-2, 2) excluding 0, +/-1
+            for (const d of denominators) {
+                // For |value| in (0,1)
+                for (let n = 1; n < d; n++) {
+                    if ((n / d) % 1 !== 0) { // Value is not an integer
+                        validFractions.push({ num: n, den: d, display: `${n}/${d}` }); // Positive
+                        validFractions.push({ num: -n, den: d, display: `-${n}/${d}` }); // Negative
+                    }
+                }
+                // For |value| in (1,2)
+                for (let n = d + 1; n < 2 * d; n++) {
+                    if ((n / d) % 1 !== 0) { // Value is not an integer
+                        validFractions.push({ num: n, den: d, display: `${n}/${d}` }); // Positive
+                        validFractions.push({ num: -n, den: d, display: `-${n}/${d}` }); // Negative
+                    }
+                }
+            }
+            break;
+        default: // Fallback to medium
+            return generateFractionQuestion(config, 'medium');
     }
 
-    const selected = fractionsPool[Math.floor(Math.random() * fractionsPool.length)];
-    const value = selected.n / selected.d;
-    const display = `${selected.n}/${selected.d}`;
+    if (validFractions.length === 0) {
+        // Fallback if no fractions were generated (should not happen with current logic)
+        if (config.debug) console.warn(`No valid fractions generated for difficulty: ${difficulty}. Falling back.`);
+        if (difficulty === 'hard') return generateFractionQuestion(config, 'medium'); // Try simpler
+        return { type: 'fraction', value: 0.5, display: "1/2", initialViewParams: { domain: [0, 1], questionContextualMagnitude: 0.1 } };
+    }
 
-    const domain = calculateStandardQuestionDomain(value); // Use new domain logic
+    const selected = validFractions[Math.floor(Math.random() * validFractions.length)];
+    const value = selected.num / selected.den;
 
-    let qcm;
-    if (selected.d <= 4) qcm = 0.1;
-    else if (selected.d <= 8) qcm = 0.05;
-    else qcm = 0.01;
+    const domain = calculateStandardQuestionDomain(value);
+
+    let qcm; // Contextual magnitude for tolerance
+    if (selected.den <= 4) qcm = 0.1;
+    else if (selected.den <= 8) qcm = 0.05;
+    else qcm = 0.02; // Tighter for larger denominators
 
     return {
         type: 'fraction',
         value: value,
-        display: `Place ${display}`,
+        display: `Place ${selected.display}`,
         initialViewParams: {
             domain: domain,
             questionContextualMagnitude: qcm,
         }
     };
 }
+
 
 export class QuestionFactory {
     constructor(config) {
@@ -149,11 +208,11 @@ export class QuestionFactory {
             'decimal': generateDecimalQuestion,
             'fraction': generateFractionQuestion,
         };
-        this.typeProbabilities = {
+        this.typeProbabilities = { // Default mix
             'decimal': 0.6,
             'fraction': 0.4,
         };
-        this.currentDifficulty = 'medium';
+        this.currentDifficulty = 'medium'; // Default difficulty
     }
 
     setDifficulty(difficulty) {
@@ -161,11 +220,12 @@ export class QuestionFactory {
             this.currentDifficulty = difficulty;
             if (this.config.debug) console.log(`QuestionFactory difficulty set to: ${difficulty}`);
         } else {
-            console.warn(`Invalid difficulty: ${difficulty}. Using current: ${this.currentDifficulty}`);
+            if (this.config.debug) console.warn(`Invalid difficulty: ${difficulty}. Using current: ${this.currentDifficulty}`);
         }
     }
 
     setQuestionTypeMix(typesConfig) {
+        // (Existing logic for setQuestionTypeMix - remains unchanged)
         const newProbabilities = {};
         let totalProb = 0;
         let validTypesFound = false;
@@ -179,7 +239,7 @@ export class QuestionFactory {
         }
 
         if (!validTypesFound) {
-            console.warn("No valid question types in typesConfig. Retaining existing mix:", this.typeProbabilities);
+            if (this.config.debug) console.warn("No valid question types in typesConfig. Retaining existing mix:", this.typeProbabilities);
             return;
         }
 
@@ -197,7 +257,7 @@ export class QuestionFactory {
                 }
                 this.typeProbabilities = newProbabilities;
             } else {
-                console.warn("Could not normalize probabilities. Retaining existing mix:", this.typeProbabilities);
+                if (this.config.debug) console.warn("Could not normalize probabilities (all zero or no valid types). Retaining existing mix:", this.typeProbabilities);
                 return;
             }
         }
@@ -214,8 +274,9 @@ export class QuestionFactory {
         );
 
         if (availableTypes.length === 0) {
-            console.error("No question types available/enabled in QuestionFactory! Falling back to decimal/medium.");
-            return this.questionGenerators['decimal'](this.config, 'medium');
+            if (this.config.debug) console.error("No question types available/enabled in QuestionFactory! Falling back to decimal/medium.");
+            // Fallback to a specific generator if type selection fails
+            return this.questionGenerators['decimal'](this.config, this.currentDifficulty);
         }
 
         for (const type of availableTypes) {
@@ -226,8 +287,8 @@ export class QuestionFactory {
             }
         }
 
-        if (!selectedType) {
-            selectedType = availableTypes[availableTypes.length - 1];
+        if (!selectedType) { // Should only happen if totalProb is not 1 due to float issues, or if availableTypes was empty.
+            selectedType = availableTypes[availableTypes.length - 1]; // Pick last available as fallback
         }
 
         return this.questionGenerators[selectedType](this.config, this.currentDifficulty);

@@ -11,13 +11,20 @@
 <body>
   <div id="app">
     <h1>Numberline Challenge</h1>
+    <div id="game-controls-top">
+      <label for="difficulty-selector">Difficulty:</label>
+      <select id="difficulty-selector">
+        <option value="easy">Easy</option>
+        <option value="medium" selected>Medium</option>
+        <option value="hard">Hard</option>
+      </select>
+    </div>
     <div id="question-display">Question will appear here...</div>
     <div id="numberline-container">
       <svg id="numberline-svg"></svg>
     </div>
-    <!-- <div id="marker-value-display">Marker: ---</div> -->
     <div id="controls">
-      <button id="start-game-button">Start Game</button>
+      <button id="start-game-button">Start/Restart Game</button>
       <button id="submit-answer-button">Submit Answer</button>
       <button id="next-question-button" style="display:none;">Next Question</button>
     </div>

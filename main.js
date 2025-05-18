@@ -12,19 +12,29 @@ console.log("EventBus instantiated.");
 
 import { NumberlineRenderer } from './src/view/NumberlineRenderer.js';
 import { UIChoreographer } from './src/view/UIChoreographer.js';
+import { debounce } from './src/utils/debounce.js';
+
 
 const numberlineRenderer = new NumberlineRenderer('numberline-svg', config, eventBus);
 numberlineRenderer.init();
-// Expose for GameController temporary marker value access
+// Expose for GameController temporary marker value access & resize
 window.numberlineRendererRef = numberlineRenderer;
 
+const debouncedResize = debounce(() => {
+    if (window.numberlineRendererRef && typeof window.numberlineRendererRef.handleResize === 'function') {
+        window.numberlineRendererRef.handleResize();
+    }
+}, 250);
+window.addEventListener('resize', debouncedResize);
+
+
 const uiElements = {
-    // markerValueDisplay: document.getElementById('marker-value-display'),
     questionDisplay: document.getElementById('question-display'),
     feedbackArea: document.getElementById('feedback-area'),
     scoreDisplay: document.getElementById('score-display'),
+    submitAnswerButton: document.getElementById('submit-answer-button'),
     nextQuestionButton: document.getElementById('next-question-button'),
-    // Add more as needed
+    difficultySelector: document.getElementById('difficulty-selector')
 };
 
 const uiChoreographer = new UIChoreographer(uiElements, eventBus, config);
@@ -35,8 +45,13 @@ import { QuestionFactory } from './src/game/QuestionFactory.js';
 import { GameController } from './src/game/GameController.js';
 
 const questionFactory = new QuestionFactory(config);
-const gameController = new GameController(questionFactory, eventBus, config);
+const gameController = new GameController(questionFactory, eventBus, config); // Pass numberlineRenderer if needed by GameController
 gameController.init();
+
+// Initial difficulty setting
+if (uiElements.difficultySelector) {
+    questionFactory.setDifficulty(uiElements.difficultySelector.value);
+}
 
 const startGameButton = document.getElementById('start-game-button');
 if (startGameButton) {
@@ -45,6 +60,20 @@ if (startGameButton) {
     });
 } else {
     console.warn("Start game button not found");
-    // Optionally auto-start for early testing
-    // gameController.startGame();
 }
+
+// Handle difficulty changes
+if (uiElements.difficultySelector) {
+    uiElements.difficultySelector.addEventListener('change', (event) => {
+        const newDifficulty = event.target.value;
+        questionFactory.setDifficulty(newDifficulty);
+        // Restart the game with the new difficulty
+        gameController.startGame();
+        if (config.debug) {
+            console.log(`Difficulty changed to: ${newDifficulty}. Restarting game.`);
+        }
+    });
+}
+
+// Auto-start game on load (optional)
+gameController.startGame();
