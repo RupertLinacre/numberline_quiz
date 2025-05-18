@@ -18,10 +18,10 @@ export class NumberlineRenderer {
         this.currentQuestionType = null;
         this.questionContextualMagnitude = null;
 
-        // New state for feedback visuals
+        // State for feedback visuals
         this.isFeedbackActive = false;
         this.feedbackCorrectValue = null;
-        this.feedbackUserValue = null; // Will store user's answer if incorrect
+        this.feedbackUserValue = null;
 
         // Groups for feedback elements
         this.feedbackCorrectGroup = null;
@@ -47,24 +47,21 @@ export class NumberlineRenderer {
 
         this._updateDimensionsAndScales();
 
-        // Initialize feedback groups (before marker, so marker is on top if overlapping)
         this.feedbackCorrectGroup = this.chartArea.append('g')
             .attr('class', 'feedback-correct-answer-group')
             .style('visibility', 'hidden');
         this.feedbackCorrectGroup.append('line')
-            .attr('class', 'feedback-line-correct'); // Styled by CSS
+            .attr('class', 'feedback-line-correct');
         this.feedbackCorrectGroup.append('text')
-            .attr('class', 'feedback-text-correct') // Styled by CSS
+            .attr('class', 'feedback-text-correct')
             .attr('text-anchor', 'middle');
 
         this.feedbackUserGroup = this.chartArea.append('g')
             .attr('class', 'feedback-user-answer-group')
             .style('visibility', 'hidden');
-        // No line for user answer, text is relative to the draggable marker
         this.feedbackUserGroup.append('text')
-            .attr('class', 'feedback-text-user') // Styled by CSS
+            .attr('class', 'feedback-text-user')
             .attr('text-anchor', 'middle');
-
 
         this.zoomBehavior = d3.zoom()
             .scaleExtent([
@@ -115,7 +112,7 @@ export class NumberlineRenderer {
         if (this.config.debug) console.log("NumberlineRenderer initialized.");
 
         this.eventBus.on('NEW_QUESTION_READY', (data) => {
-            this.isFeedbackActive = false; // Hide feedback for new question
+            this.isFeedbackActive = false;
 
             if (data.questionData) {
                 this.currentQuestionType = data.questionData.type;
@@ -135,8 +132,6 @@ export class NumberlineRenderer {
             }
 
             this.resetMarker();
-            // updateAxis will be called by setDomain or resetMarker, which will hide feedback
-            // If setDomain wasn't called, explicitly call updateAxis if necessary
             if (!(data.initialViewParams && data.initialViewParams.domain)) {
                 this.updateAxis(this.currentTransform);
             }
@@ -145,9 +140,9 @@ export class NumberlineRenderer {
         this.eventBus.on('SHOW_FEEDBACK', (data) => {
             this.isFeedbackActive = true;
             this.feedbackCorrectValue = data.correctAnswer;
-            this.feedbackUserValue = data.userAnswer; // Will be null if answer was correct
+            this.feedbackUserValue = data.userAnswer;
 
-            this.updateAxis(this.currentTransform); // Redraw to show feedback
+            this.updateAxis(this.currentTransform);
         });
     }
 
@@ -336,6 +331,61 @@ export class NumberlineRenderer {
         return ticks;
     }
 
+    /**
+     * Determines if a major tick label should be shown based on the current question
+     * type and contextual magnitude.
+     * This method DOES NOT yet consider the isFeedbackActive state for forcing labels.
+     * That will be added when the feature itself is implemented.
+     * @param {number} tickDataValue - The numerical value of the tick.
+     * @returns {boolean} - True if the label should be shown, false otherwise.
+     */
+    _shouldShowMajorTickLabel(tickDataValue) {
+        // When the "show all labels on feedback" feature is implemented,
+        // the first check here will be:
+        // if (this.isFeedbackActive) { return true; }
+
+        // For fraction questions, always show major tick labels.
+        if (this.currentQuestionType === 'fraction') {
+            return true;
+        }
+
+        // For decimal questions, apply suppression logic.
+        if (this.currentQuestionType === 'decimal') {
+            // If no specific contextual magnitude is provided, or it's extremely small,
+            // show all major labels for decimals.
+            if (this.questionContextualMagnitude === null || this.questionContextualMagnitude <= 1e-9) {
+                return true;
+            }
+
+            // Always show the label for the value 0.
+            if (Math.abs(tickDataValue) < 1e-12) { // Using a small epsilon for 0 check
+                return true;
+            }
+
+            const allowedLabelingMagnitude = this.questionContextualMagnitude * 10;
+            // If the determined allowed labeling magnitude is effectively zero,
+            // it implies we should show the label. This can happen if questionContextualMagnitude
+            // is very small but not caught by the earlier check (e.g. 1e-10).
+            if (Math.abs(allowedLabelingMagnitude) < 1e-12) {
+                return true;
+            }
+
+            // Main decimal suppression logic: show if tickDataValue is an integer multiple
+            // of allowedLabelingMagnitude.
+            const ratio = tickDataValue / allowedLabelingMagnitude;
+            if (Math.abs(ratio - Math.round(ratio)) < 1e-9) {
+                return true;
+            }
+
+            // If none of the above conditions for showing a decimal label are met, suppress it.
+            return false;
+        }
+
+        // Default for unknown or other question types: show all major labels.
+        // This ensures that if currentQuestionType is not 'fraction' or 'decimal', labels are shown.
+        return true;
+    }
+
     updateAxis(transform) {
         if (this.chartWidth <= 0) {
             this._updateDimensionsAndScales();
@@ -369,15 +419,7 @@ export class NumberlineRenderer {
             });
 
         ticks.filter(d => d.isMajor)
-            .filter(d => {
-                if (this.currentQuestionType === 'fraction') return true;
-                if (this.questionContextualMagnitude === null || this.questionContextualMagnitude <= 1e-9) return true;
-                const allowedLabelingMagnitude = this.questionContextualMagnitude * 10;
-                if (Math.abs(allowedLabelingMagnitude) < 1e-12) return true;
-                if (Math.abs(d.value) < 1e-12) return true;
-                const ratio = d.value / allowedLabelingMagnitude;
-                return Math.abs(ratio - Math.round(ratio)) < 1e-9;
-            })
+            .filter(d => this._shouldShowMajorTickLabel(d.value)) // Use the new helper method
             .append('text')
             .attr('y', (this.config.majorTickLength || 20) + ((this.config.labelFontSizePx || 20) * 0.8))
             .attr('text-anchor', 'middle')
@@ -385,12 +427,12 @@ export class NumberlineRenderer {
             .text(d => formatNumber(d.value));
 
         this._updateMarkerScreenPosition();
-        this._renderFeedbackVisuals(currentScale); // New call to render feedback
+        this._renderFeedbackVisuals(currentScale);
     }
 
     _renderFeedbackVisuals(currentScale) {
         const labelFontSize = this.config.labelFontSizePx || 20;
-        const textYOffset = labelFontSize * 1.5; // Standard offset below a line/marker
+        const textYOffset = labelFontSize * 1.5;
 
         if (!this.isFeedbackActive || this.feedbackCorrectValue === null) {
             this.feedbackCorrectGroup.style('visibility', 'hidden');
@@ -398,7 +440,6 @@ export class NumberlineRenderer {
             return;
         }
 
-        // --- Correct Answer Visuals (Green Line and Text) ---
         this.feedbackCorrectGroup.style('visibility', 'visible');
         const xCorrect = currentScale(this.feedbackCorrectValue);
         if (!isFinite(xCorrect) || isNaN(xCorrect)) {
@@ -424,7 +465,6 @@ export class NumberlineRenderer {
             .text(formatNumber(this.feedbackCorrectValue))
             .style('font-size', `${labelFontSize}px`);
 
-        // --- User Answer Visuals (Red Text, if incorrect) ---
         if (this.feedbackUserValue !== null) {
             this.feedbackUserGroup.style('visibility', 'visible');
             const xUser = currentScale(this.feedbackUserValue);
@@ -442,10 +482,9 @@ export class NumberlineRenderer {
             const defaultYRedText = (markerActualLength / 2) + textYOffset * 2;
             let finalYRedText = defaultYRedText;
 
-            // Check for horizontal proximity to green text and adjust Y if needed
-            const horizontalProximityThreshold = labelFontSize * 3; // Approx 3 characters wide
+            const horizontalProximityThreshold = labelFontSize * 3;
             if (isFinite(xUser) && isFinite(xCorrect) && Math.abs(xUser - xCorrect) < horizontalProximityThreshold) {
-                const minYRedText = yGreenText + labelFontSize + (labelFontSize * 0.3); // Green text Y + 1 font height + padding
+                const minYRedText = yGreenText + labelFontSize + (labelFontSize * 0.3);
                 finalYRedText = Math.max(defaultYRedText, minYRedText);
             }
 
@@ -510,7 +549,6 @@ export class NumberlineRenderer {
         }
         this._updateMarkerScreenPosition();
         if (this.config.debug) console.log("Marker reset to:", this.markerDataValue);
-        // Call updateAxis if marker reset might affect visual elements tied to feedback state
         if (this.isFeedbackActive) {
             this.updateAxis(this.currentTransform);
         }
