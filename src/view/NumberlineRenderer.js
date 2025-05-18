@@ -390,7 +390,7 @@ export class NumberlineRenderer {
 
     _renderFeedbackVisuals(currentScale) {
         const labelFontSize = this.config.labelFontSizePx || 20;
-        const textYOffset = labelFontSize * 1.2; // Standard offset below a line/marker
+        const textYOffset = labelFontSize * 1.5; // Standard offset below a line/marker
 
         if (!this.isFeedbackActive || this.feedbackCorrectValue === null) {
             this.feedbackCorrectGroup.style('visibility', 'hidden');

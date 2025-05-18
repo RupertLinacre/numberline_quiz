@@ -1,7 +1,7 @@
 import * as d3 from 'd3';
 
 export function formatNumber(value) {
-    return d3.format('.10~g')(value);
+    return d3.format('.5~g')(value);
 }
 
 // Returns the contextual magnitude (e.g., 0.1 for 1 decimal, 0.01 for 2 decimals)
