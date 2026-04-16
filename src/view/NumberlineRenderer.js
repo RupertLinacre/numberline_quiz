@@ -29,6 +29,7 @@ export class NumberlineRenderer {
 
         this.effectiveSvgWidth = 0;
         this.chartWidth = 0;
+        this.layout = null;
     }
 
     init() {
@@ -160,6 +161,54 @@ export class NumberlineRenderer {
         });
     }
 
+    _getResponsiveLayout(svgWidth) {
+        const isNarrow = svgWidth < 640;
+        const isTiny = svgWidth < 380;
+        const baseMargins = this.config.margins || { top: 50, right: 20, bottom: 70, left: 20 };
+        const markerConfig = this.config.markerConfig || {};
+
+        return {
+            svgHeight: isNarrow ? 170 : (this.config.svgHeight || 150),
+            margins: {
+                top: isNarrow ? 58 : baseMargins.top,
+                right: isNarrow ? 46 : Math.max(baseMargins.right, 56),
+                bottom: isNarrow ? 82 : baseMargins.bottom,
+                left: isNarrow ? 46 : Math.max(baseMargins.left, 56),
+            },
+            majorTickLength: isNarrow ? 18 : (this.config.majorTickLength || 20),
+            minorTickLength: isNarrow ? 9 : (this.config.minorTickLength || 10),
+            midMinorTickLength: isNarrow ? 16 : (this.config.midMinorTickLength || 18),
+            labelFontSizePx: isTiny ? 15 : (isNarrow ? 16 : (this.config.labelFontSizePx || 20)),
+            markerCircleRadius: isNarrow ? 14 : (markerConfig.circleRadius || 10),
+            markerLineWidthToMajorTickRatio: isNarrow ? 1.65 : (markerConfig.lineWidthToMajorTickRatio || 1.5),
+            targetMajorTicksOnScreen: isNarrow ? 3 : (this.config.targetMajorTicksOnScreen || 4),
+            minPixelSeparationForMajor: isTiny ? 112 : (isNarrow ? 130 : (this.config.minPixelSeparationForMajor || 200)),
+            majorTickPixelSeparationMultiplier: this.config.majorTickPixelSeparationMultiplier || 5,
+        };
+    }
+
+    _getLayout() {
+        if (!this.layout) {
+            this.layout = this._getResponsiveLayout(this.effectiveSvgWidth || this.config.svgWidth || 800);
+        }
+        return this.layout;
+    }
+
+    _updateMarkerShape() {
+        if (!this.marker) return;
+        const layout = this._getLayout();
+        const markerLineLength = layout.majorTickLength * layout.markerLineWidthToMajorTickRatio;
+
+        this.marker.select('line')
+            .attr('y1', -markerLineLength)
+            .attr('y2', markerLineLength)
+            .attr('stroke-width', 2);
+
+        this.marker.select('circle')
+            .attr('cy', 0)
+            .attr('r', layout.markerCircleRadius);
+    }
+
     _updateDimensionsAndScales() {
         const svgNode = this.svg.node();
         if (!svgNode) {
@@ -171,16 +220,24 @@ export class NumberlineRenderer {
             if (this.config.debug) console.warn("Effective SVG width is 0 or negative. Using fallback. Ensure SVG is visible.");
             this.effectiveSvgWidth = this.config.svgWidth || 800;
         }
-        this.svg.attr('viewBox', `0 0 ${this.effectiveSvgWidth} ${this.config.svgHeight}`);
-        this.chartWidth = this.effectiveSvgWidth - this.config.margins.left - this.config.margins.right;
+        this.layout = this._getResponsiveLayout(this.effectiveSvgWidth);
+        let margins = { ...this.layout.margins };
+        this.svg
+            .attr('height', this.layout.svgHeight)
+            .attr('viewBox', `0 0 ${this.effectiveSvgWidth} ${this.layout.svgHeight}`);
+        this.chartWidth = this.effectiveSvgWidth - margins.left - margins.right;
         if (this.chartWidth <= 0) {
             if (this.config.debug) console.warn(`Chart width is ${this.chartWidth} (non-positive) after margins. Forcing to 50% of SVG width and adjusting margins for chartArea.`);
-            this.config.margins.left = this.effectiveSvgWidth * 0.25;
-            this.config.margins.right = this.effectiveSvgWidth * 0.25;
+            margins = {
+                ...margins,
+                left: this.effectiveSvgWidth * 0.25,
+                right: this.effectiveSvgWidth * 0.25,
+            };
+            this.layout = { ...this.layout, margins };
             this.chartWidth = this.effectiveSvgWidth * 0.5;
             if (this.chartWidth <= 0) this.chartWidth = 1;
         }
-        this.chartArea.attr('transform', `translate(${this.config.margins.left}, ${this.config.margins.top})`);
+        this.chartArea.attr('transform', `translate(${margins.left}, ${margins.top})`);
         let backgroundRect = this.chartArea.select('.chart-background');
         if (backgroundRect.empty()) {
             backgroundRect = this.chartArea.insert('rect', ':first-child')
@@ -189,13 +246,14 @@ export class NumberlineRenderer {
         }
         backgroundRect
             .attr('x', 0)
-            .attr('y', -this.config.margins.top)
+            .attr('y', -margins.top)
             .attr('width', this.chartWidth)
-            .attr('height', this.config.svgHeight);
+            .attr('height', this.layout.svgHeight);
         this.baseScale.range([0, this.chartWidth]);
         this.chartArea.select('.axis-line')
             .attr('x1', 0)
             .attr('x2', this.chartWidth);
+        this._updateMarkerShape();
         if (this.config.debug) {
             console.log(`Dimensions updated: effectiveSvgWidth=${this.effectiveSvgWidth}, chartWidth=${this.chartWidth}`);
         }
@@ -219,16 +277,11 @@ export class NumberlineRenderer {
             }
         }
         this.marker = this.chartArea.append('g').attr('class', 'draggable-marker');
-        const markerLineLengthRatio = (this.config.markerConfig && this.config.markerConfig.lineWidthToMajorTickRatio) || 1.5;
-        const majorTickLen = this.config.majorTickLength || 20;
         this.marker.append('line')
-            .attr('y1', -(majorTickLen * markerLineLengthRatio))
-            .attr('y2', (majorTickLen * markerLineLengthRatio))
             .attr('stroke-width', 2);
         this.marker.append('circle')
-            .attr('cy', 0)
-            .attr('r', (this.config.markerConfig && this.config.markerConfig.circleRadius) || 10)
             .style('cursor', 'ew-resize');
+        this._updateMarkerShape();
         const dragBehavior = d3.drag()
             .on('start', (event) => {
                 if (event && event.sourceEvent) event.sourceEvent.stopPropagation();
@@ -269,9 +322,10 @@ export class NumberlineRenderer {
             return [];
         }
 
-        const targetMajorTicksOnScreen = this.config.targetMajorTicksOnScreen || 5;
-        const minPixelSeparationForMajor = this.config.minPixelSeparationForMajor || 50;
-        const maxPixelSeparationForMajor = minPixelSeparationForMajor * (this.config.majorTickPixelSeparationMultiplier || 3);
+        const layout = this._getLayout();
+        const targetMajorTicksOnScreen = layout.targetMajorTicksOnScreen;
+        const minPixelSeparationForMajor = layout.minPixelSeparationForMajor;
+        const maxPixelSeparationForMajor = minPixelSeparationForMajor * layout.majorTickPixelSeparationMultiplier;
         let idealNumMajorTicks = Math.max(1, Math.min(targetMajorTicksOnScreen, currentChartWidth / minPixelSeparationForMajor));
         if (!isFinite(idealNumMajorTicks) || idealNumMajorTicks <= 0) idealNumMajorTicks = 1;
 
@@ -394,6 +448,7 @@ export class NumberlineRenderer {
         }
 
         this.currentTransform = transform;
+        const layout = this._getLayout();
         const currentScale = this.currentTransform.rescaleX(this.baseScale);
         this.chartArea.selectAll('g.tick').remove();
         const tickData = this._calculateTickLevels(currentScale);
@@ -411,17 +466,17 @@ export class NumberlineRenderer {
         ticks.append('line')
             .attr('y1', 0)
             .attr('y2', d => {
-                if (d.isMajor) return this.config.majorTickLength || 20;
-                if (d.isMidMinor) return this.config.midMinorTickLength || 15;
-                return this.config.minorTickLength || 10;
+                if (d.isMajor) return layout.majorTickLength;
+                if (d.isMidMinor) return layout.midMinorTickLength;
+                return layout.minorTickLength;
             });
 
         ticks.filter(d => d.isMajor)
             .filter(d => this._shouldShowMajorTickLabel(d.value))
             .append('text')
-            .attr('y', (this.config.majorTickLength || 20) + ((this.config.labelFontSizePx || 20) * 0.8))
+            .attr('y', layout.majorTickLength + (layout.labelFontSizePx * 0.8))
             .attr('text-anchor', 'middle')
-            .attr('font-size', `${this.config.labelFontSizePx || 20}px`)
+            .attr('font-size', `${layout.labelFontSizePx}px`)
             .text(d => formatNumber(d.value));
 
         this._updateMarkerScreenPosition();
@@ -429,7 +484,8 @@ export class NumberlineRenderer {
     }
 
     _renderFeedbackVisuals(currentScale) {
-        const labelFontSize = this.config.labelFontSizePx || 20;
+        const layout = this._getLayout();
+        const labelFontSize = layout.labelFontSizePx;
         const textYOffset = labelFontSize * 1.5;
 
         // This check is now very important: only proceed if feedback is truly active AND we have a correct value.
@@ -449,7 +505,7 @@ export class NumberlineRenderer {
 
         const hlConfig = this.config.correctAnswerHighlightConfig || {};
         const highlightLengthRatio = hlConfig.lengthToMajorTickRatio || 1.8;
-        const highlightBaseLength = this.config.majorTickLength || 20;
+        const highlightBaseLength = layout.majorTickLength;
         const highlightActualLength = highlightBaseLength * highlightLengthRatio;
         const highlightStrokeWidth = hlConfig.strokeWidth || 3;
 
@@ -473,9 +529,8 @@ export class NumberlineRenderer {
                 this.feedbackUserGroup.attr('transform', `translate(${xUser}, 0)`);
             }
 
-            const markerConfig = this.config.markerConfig || {};
-            const markerLineLengthRatio = markerConfig.lineWidthToMajorTickRatio || 1.5;
-            const markerBaseLength = this.config.majorTickLength || 20;
+            const markerLineLengthRatio = layout.markerLineWidthToMajorTickRatio;
+            const markerBaseLength = layout.majorTickLength;
             const markerActualLength = markerBaseLength * markerLineLengthRatio;
 
             const defaultYRedText = (markerActualLength / 2) + textYOffset * 2;

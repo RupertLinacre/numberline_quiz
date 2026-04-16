@@ -3,112 +3,162 @@
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
-  color-scheme: light dark; /* Basic theme support */
-  /* Adjust colors as needed, or use a more robust theming solution if desired */
-  color: #333; /* Default light mode text color */
-  background-color: #f8f9fa; /* Default light mode background */
-
+  color-scheme: light dark;
+  color: #2f3437;
+  background-color: #f8f9fa;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+}
 
 body {
   margin: 0;
-  padding: 0; /* Remove default body margin */
-  display: flex;
-  flex-direction: column; /* Align children vertically */
-  align-items: center; /* Center #app horizontally */
   min-height: 100vh;
-  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-x: hidden;
 }
 
 #app {
   width: 100%;
-
+  max-width: 1240px;
   margin: 0 auto;
-  padding: 20px; /* Padding around the entire app content */
+  padding: 22px 20px 10px;
   text-align: center;
-  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 15px; /* Spacing between direct children of #app */
+  gap: 14px;
 }
 
 h1 {
-  font-size: 2.2em; /* Adjusted for better responsiveness */
+  font-size: 2.2rem;
   line-height: 1.1;
-  margin-bottom: 0.5em;
+  margin: 0 0 0.25rem;
+}
+
+#game-controls-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+#game-controls-top label {
+  font-weight: 600;
+}
+
+select,
+button {
+  min-height: 44px;
+  font: inherit;
+}
+
+select {
+  max-width: 100%;
+  border: 1px solid #b8c2cc;
+  border-radius: 8px;
+  padding: 0.55rem 2rem 0.55rem 0.75rem;
+  background-color: #fff;
+  color: #2f3437;
+}
+
+#question-display {
+  min-height: 2rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 #numberline-container {
-  width: 100%; /* Take full width of its parent (#app) */
-  border: 1px solid #ccc;
-  box-sizing: border-box;
-  /* The height of the SVG will be set by config.svgHeight */
+  width: 100%;
+  border: 1px solid #c7ccd1;
+  border-radius: 8px;
+  background: #fff;
 }
 
 #numberline-svg {
-  display: block; /* Removes extra space below SVG if it's inline */
+  display: block;
   width: 100%;
-  /* height will be set via JavaScript using config.svgHeight, applied directly or via viewBox */
+  min-height: 150px;
+  touch-action: none;
+  user-select: none;
 }
 
 #controls {
   display: flex;
-  flex-wrap: wrap; /* Allow buttons to wrap on smaller screens */
+  flex-wrap: wrap;
   justify-content: center;
-  gap: 10px; /* Spacing between control buttons */
-  margin: 15px 0;
+  gap: 10px;
+  margin: 8px 0 2px;
 }
 
 button {
   border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
+  border: 1px solid #c4ccd4;
+  padding: 0.65em 1.2em;
+  font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.25s;
-  background-color: #e9ecef; /* Light mode button */
-  color: #333;
+  transition: border-color 0.2s, background-color 0.2s, transform 0.2s;
+  background-color: #edf1f4;
+  color: #2f3437;
 }
-
 
 button:hover {
-  border-color: #646cff;
+  border-color: #3273a8;
+  background-color: #e5eef5;
 }
+
+button:active {
+  transform: translateY(1px);
+}
+
 button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+button:focus-visible,
+select:focus,
+select:focus-visible {
+  outline: 3px solid #7ab6e4;
+  outline-offset: 2px;
 }
 
 #feedback-area {
-  margin-top: 10px;
+  width: 100%;
+  max-width: 72ch;
+  align-self: center;
+  margin-top: 4px;
   padding: 10px;
-  border-radius: 4px;
-  min-height: 1.5em; /* Ensure it has some height even when empty */
+  border-radius: 6px;
+  min-height: 2.75rem;
 }
 
 #feedback-area.info {
   background-color: #e7f3ff;
-  color: #00529B;
+  color: #00529b;
   border: 1px solid #b8dcfc;
 }
+
 #feedback-area.success {
   background-color: #d4edda;
   color: #155724;
   border: 1px solid #c3e6cb;
 }
+
 #feedback-area.warning {
   background-color: #fff3cd;
   color: #856404;
   border: 1px solid #ffeeba;
 }
+
 #feedback-area.error {
   background-color: #f8d7da;
   color: #721c24;
@@ -116,36 +166,23 @@ button:focus-visible {
 }
 
 #score-display {
-  font-weight: bold;
-  font-size: 1.2em;
+  font-weight: 700;
+  font-size: 1.2rem;
 }
 
-/* Ensure tick text is visible in both light and dark modes */
-.tick text {
-  fill: currentColor; /* Inherits color from parent, good for theme changes */
+.source-link {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto 18px;
+  padding: 0 20px;
+  text-align: center;
+  font-size: 1rem;
 }
 
-.tick.major line {
-  stroke: #333;
-}
-.tick.minor line {
-  stroke: #aaa;
-}
-.axis-line {
-  stroke: #333;
+.source-link a {
+  color: #1d638f;
 }
 
-.draggable-marker line, .draggable-marker circle {
-    stroke: #d9534f; /* A reddish color */
-    fill: #d9534f;
-}
-
-.correct-answer-highlight {
-    stroke: #5cb85c; /* A greenish color */
-}
-/* ... (your existing styles) ... */
-
-/* Ensure tick text is visible in both light and dark modes */
 .tick text {
   fill: currentColor;
 }
@@ -153,48 +190,157 @@ button:focus-visible {
 .tick.major line {
   stroke: #333;
 }
+
 .tick.minor line {
-  stroke: #aaa;
+  stroke: #9aa3aa;
 }
-@media (prefers-color-scheme: dark) {
-  .tick.major line {
-    stroke: #ccc;
-  }
-  .tick.minor line {
-    stroke: #666;
-  }
-}
+
 .axis-line {
   stroke: #333;
 }
-@media (prefers-color-scheme: dark) {
-  .axis-line {
-    stroke: #ccc;
+
+.draggable-marker {
+  touch-action: none;
+}
+
+.draggable-marker line,
+.draggable-marker circle {
+  stroke: #d9534f;
+  fill: #d9534f;
+}
+
+.feedback-line-correct {
+  stroke: #3f8f52;
+}
+
+.feedback-text-correct {
+  fill: #3f8f52;
+}
+
+.feedback-text-user {
+  fill: #d9534f;
+}
+
+@media (max-width: 640px) {
+  #app {
+    padding: 14px 10px 8px;
+    gap: 10px;
+  }
+
+  h1 {
+    font-size: 1.55rem;
+    margin-bottom: 0;
+  }
+
+  #game-controls-top {
+    justify-content: stretch;
+    gap: 6px;
+    text-align: left;
+  }
+
+  #game-controls-top label {
+    flex-basis: 100%;
+  }
+
+  select {
+    width: 100%;
+    padding-top: 0.7rem;
+    padding-bottom: 0.7rem;
+  }
+
+  #question-display {
+    min-height: 1.8rem;
+    font-size: 1.25rem;
+  }
+
+  #numberline-container {
+    border-radius: 6px;
+  }
+
+  #numberline-svg {
+    min-height: 170px;
+  }
+
+  #controls {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin: 4px 0 0;
+  }
+
+  button {
+    width: 100%;
+    padding: 0.8em 1em;
+  }
+
+  #feedback-area {
+    min-height: 2.5rem;
+    padding: 8px;
+    font-size: 0.95rem;
+  }
+
+  #score-display {
+    font-size: 1rem;
+  }
+
+  .source-link {
+    margin-bottom: 12px;
+    padding: 0 10px;
+    font-size: 0.9rem;
   }
 }
 
-.draggable-marker line, .draggable-marker circle {
-    stroke: #d9534f; /* A reddish color for the draggable marker */
-    fill: #d9534f;
+@media (min-width: 641px) and (max-width: 900px) {
+  #app {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  h1 {
+    font-size: 1.9rem;
+  }
 }
+
 @media (prefers-color-scheme: dark) {
-    .draggable-marker line, .draggable-marker circle {
-        stroke: #e57373;
-        fill: #e57373;
-    }
-}
+  :root {
+    color: #eceff1;
+    background-color: #16191b;
+  }
 
-/* Styles for feedback visuals */
-.feedback-line-correct {
-    stroke: #5cb85c; /* Green */
-    /* stroke-width will be set by JS from config */
-}
-.feedback-text-correct {
-    fill: #5cb85c; /* Green */
-    /* font-size will be set by JS from config */
-}
-.feedback-text-user {
-    fill: #d9534f; /* Red */
-    /* font-size will be set by JS from config */
-}
+  select,
+  button,
+  #numberline-container {
+    background-color: #23282c;
+    color: #eceff1;
+  }
 
+  select,
+  button,
+  #numberline-container {
+    border-color: #535d66;
+  }
+
+  button:hover {
+    border-color: #8ac5f4;
+    background-color: #2b343b;
+  }
+
+  .source-link a {
+    color: #9ed1f4;
+  }
+
+  .tick.major line,
+  .axis-line {
+    stroke: #d1d5d8;
+  }
+
+  .tick.minor line {
+    stroke: #737d86;
+  }
+
+  .draggable-marker line,
+  .draggable-marker circle {
+    stroke: #e57373;
+    fill: #e57373;
+  }
+}
