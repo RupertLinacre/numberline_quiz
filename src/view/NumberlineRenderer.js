@@ -162,27 +162,29 @@ export class NumberlineRenderer {
     }
 
     _getResponsiveLayout(svgWidth) {
+        const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : Infinity;
         const isNarrow = svgWidth < 640;
+        const isShort = viewportHeight <= 520;
         const isTiny = svgWidth < 380;
         const baseMargins = this.config.margins || { top: 50, right: 20, bottom: 70, left: 20 };
         const markerConfig = this.config.markerConfig || {};
 
         return {
-            svgHeight: isNarrow ? 170 : (this.config.svgHeight || 150),
+            svgHeight: isShort ? 118 : (isNarrow ? 170 : (this.config.svgHeight || 150)),
             margins: {
-                top: isNarrow ? 58 : baseMargins.top,
-                right: isNarrow ? 46 : Math.max(baseMargins.right, 56),
-                bottom: isNarrow ? 82 : baseMargins.bottom,
-                left: isNarrow ? 46 : Math.max(baseMargins.left, 56),
+                top: isShort ? 40 : (isNarrow ? 58 : baseMargins.top),
+                right: isShort ? 44 : (isNarrow ? 46 : Math.max(baseMargins.right, 56)),
+                bottom: isShort ? 56 : (isNarrow ? 82 : baseMargins.bottom),
+                left: isShort ? 44 : (isNarrow ? 46 : Math.max(baseMargins.left, 56)),
             },
-            majorTickLength: isNarrow ? 18 : (this.config.majorTickLength || 20),
-            minorTickLength: isNarrow ? 9 : (this.config.minorTickLength || 10),
-            midMinorTickLength: isNarrow ? 16 : (this.config.midMinorTickLength || 18),
-            labelFontSizePx: isTiny ? 15 : (isNarrow ? 16 : (this.config.labelFontSizePx || 20)),
-            markerCircleRadius: isNarrow ? 14 : (markerConfig.circleRadius || 10),
-            markerLineWidthToMajorTickRatio: isNarrow ? 1.65 : (markerConfig.lineWidthToMajorTickRatio || 1.5),
-            targetMajorTicksOnScreen: isNarrow ? 3 : (this.config.targetMajorTicksOnScreen || 4),
-            minPixelSeparationForMajor: isTiny ? 112 : (isNarrow ? 130 : (this.config.minPixelSeparationForMajor || 200)),
+            majorTickLength: isShort ? 16 : (isNarrow ? 18 : (this.config.majorTickLength || 20)),
+            minorTickLength: isShort ? 8 : (isNarrow ? 9 : (this.config.minorTickLength || 10)),
+            midMinorTickLength: isShort ? 14 : (isNarrow ? 16 : (this.config.midMinorTickLength || 18)),
+            labelFontSizePx: isShort ? 14 : (isTiny ? 15 : (isNarrow ? 16 : (this.config.labelFontSizePx || 20))),
+            markerCircleRadius: isShort ? 12 : (isNarrow ? 14 : (markerConfig.circleRadius || 10)),
+            markerLineWidthToMajorTickRatio: isShort ? 1.5 : (isNarrow ? 1.65 : (markerConfig.lineWidthToMajorTickRatio || 1.5)),
+            targetMajorTicksOnScreen: (isNarrow || isShort) ? 3 : (this.config.targetMajorTicksOnScreen || 4),
+            minPixelSeparationForMajor: isShort ? 110 : (isTiny ? 112 : (isNarrow ? 130 : (this.config.minPixelSeparationForMajor || 200))),
             majorTickPixelSeparationMultiplier: this.config.majorTickPixelSeparationMultiplier || 5,
         };
     }

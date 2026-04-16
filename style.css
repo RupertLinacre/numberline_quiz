@@ -301,6 +301,91 @@ select:focus-visible {
   }
 }
 
+@media (max-height: 520px) and (orientation: landscape) and (min-width: 520px) {
+  #app {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px 12px;
+    padding: 8px 12px 6px;
+  }
+
+  h1 {
+    grid-column: 1;
+    font-size: 1.35rem;
+    text-align: left;
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  #game-controls-top {
+    grid-column: 2;
+    justify-content: end;
+    gap: 8px;
+    text-align: right;
+  }
+
+  #game-controls-top label {
+    flex-basis: auto;
+    white-space: nowrap;
+  }
+
+  select,
+  button {
+    min-height: 38px;
+  }
+
+  select {
+    width: auto;
+    max-width: 11rem;
+    padding-top: 0.42rem;
+    padding-bottom: 0.42rem;
+  }
+
+  #question-display,
+  #numberline-container,
+  #controls,
+  #feedback-area,
+  #score-display {
+    grid-column: 1 / -1;
+  }
+
+  #question-display {
+    min-height: 1.45rem;
+    font-size: 1.1rem;
+  }
+
+  #numberline-svg {
+    min-height: 118px;
+  }
+
+  #controls {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    margin: 0;
+  }
+
+  button {
+    width: auto;
+    padding: 0.45em 0.9em;
+  }
+
+  #feedback-area {
+    min-height: 2rem;
+    padding: 6px 8px;
+    font-size: 0.9rem;
+  }
+
+  #score-display {
+    font-size: 0.95rem;
+  }
+
+  .source-link {
+    display: none;
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     color: #eceff1;
