@@ -1,3 +1,5 @@
+import { formatNumber } from '../utils/formatter.js';
+
 export class GameController {
     constructor(questionFactory, eventBus, config) {
         this.questionFactory = questionFactory;
@@ -45,7 +47,11 @@ export class GameController {
         const targetValue = this.currentQuestion.value;
         let dynamicTolerance;
 
-        if (this.currentQuestion.type === 'fraction') {
+        const hasQuestionTolerance = typeof this.currentQuestion.tolerance === 'number' && this.currentQuestion.tolerance > 0;
+
+        if (hasQuestionTolerance) {
+            dynamicTolerance = this.currentQuestion.tolerance;
+        } else if (this.currentQuestion.type === 'fraction') {
             dynamicTolerance = Math.abs(targetValue * 0.05);
         } else if (this.currentQuestion.type === 'decimal') {
             const contextualMagnitude = this.currentQuestion.initialViewParams?.questionContextualMagnitude;
@@ -57,7 +63,9 @@ export class GameController {
         } else {
             dynamicTolerance = 0.01;
         }
-        if (!isFinite(dynamicTolerance) || dynamicTolerance <= 0 || dynamicTolerance > 0.5 * Math.abs(targetValue || 1)) {
+        if (!isFinite(dynamicTolerance) || dynamicTolerance <= 0) {
+            dynamicTolerance = 0.001;
+        } else if (!hasQuestionTolerance && dynamicTolerance > 0.5 * Math.abs(targetValue || 1)) {
             dynamicTolerance = 0.001;
         }
 
@@ -70,11 +78,12 @@ export class GameController {
             this.eventBus.emit('UPDATE_SCORE', { newScore: this.score });
             feedbackMessage = 'Correct!';
         } else {
-            let targetDisplay = typeof targetValue === 'number' ? targetValue.toFixed(4) : targetValue;
-            let differenceDisplay = typeof difference === 'number' ? difference.toFixed(4) : difference;
+            let targetDisplay = this.currentQuestion.answerDisplay ||
+                (typeof targetValue === 'number' ? formatNumber(targetValue) : targetValue);
+            let differenceDisplay = typeof difference === 'number' ? formatNumber(difference) : difference;
             feedbackMessage = `Not quite. Correct was ${targetDisplay}. You were off by ${differenceDisplay}.`;
             if (this.config.debug) {
-                let toleranceDisplay = typeof dynamicTolerance === 'number' ? dynamicTolerance.toFixed(5) : dynamicTolerance;
+                let toleranceDisplay = typeof dynamicTolerance === 'number' ? formatNumber(dynamicTolerance) : dynamicTolerance;
                 feedbackMessage += ` (Tolerance: ±${toleranceDisplay})`;
             }
         }

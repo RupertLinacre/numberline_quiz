@@ -48,7 +48,7 @@ const questionFactory = new QuestionFactory(config);
 const gameController = new GameController(questionFactory, eventBus, config); // Pass numberlineRenderer if needed by GameController
 gameController.init();
 
-// Initial difficulty setting
+// Initial year-group setting
 if (uiElements.difficultySelector) {
     questionFactory.setDifficulty(uiElements.difficultySelector.value);
 }
@@ -62,15 +62,15 @@ if (startGameButton) {
     console.warn("Start game button not found");
 }
 
-// Handle difficulty changes
+// Handle year-group changes
 if (uiElements.difficultySelector) {
     uiElements.difficultySelector.addEventListener('change', (event) => {
-        const newDifficulty = event.target.value;
-        questionFactory.setDifficulty(newDifficulty);
-        // Restart the game with the new difficulty
+        const newYearGroup = event.target.value;
+        questionFactory.setDifficulty(newYearGroup);
+        // Restart the game with the new year group
         gameController.startGame();
         if (config.debug) {
-            console.log(`Difficulty changed to: ${newDifficulty}. Restarting game.`);
+            console.log(`Year group changed to: ${newYearGroup}. Restarting game.`);
         }
     });
 }
