@@ -315,6 +315,23 @@ export class NumberlineRenderer {
         this.marker.attr('transform', `translate(${xPosition}, 0)`);
     }
 
+    _updateAxisLineExtent(currentScale, tickData) {
+        const tickPositions = tickData
+            .map(d => currentScale(d.value))
+            .filter(xPosition => isFinite(xPosition) && !isNaN(xPosition));
+
+        const lineStart = tickPositions.length > 0
+            ? Math.min(0, ...tickPositions)
+            : 0;
+        const lineEnd = tickPositions.length > 0
+            ? Math.max(this.chartWidth, ...tickPositions)
+            : this.chartWidth;
+
+        this.chartArea.select('.axis-line')
+            .attr('x1', lineStart)
+            .attr('x2', lineEnd);
+    }
+
     _calculateTickLevels(currentScale) {
         const [domainMin, domainMax] = currentScale.domain();
         let domainWidth = domainMax - domainMin;
@@ -454,6 +471,7 @@ export class NumberlineRenderer {
         const currentScale = this.currentTransform.rescaleX(this.baseScale);
         this.chartArea.selectAll('g.tick').remove();
         const tickData = this._calculateTickLevels(currentScale);
+        this._updateAxisLineExtent(currentScale, tickData);
 
         const ticks = this.chartArea.selectAll('g.tick')
             .data(tickData, d => d.value)

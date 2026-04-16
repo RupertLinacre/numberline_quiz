@@ -31,7 +31,6 @@ body {
 
 #app {
   width: 100%;
-  max-width: 1240px;
   margin: 0 auto;
   padding: 22px 20px 10px;
   text-align: center;
@@ -172,7 +171,6 @@ select:focus-visible {
 
 .source-link {
   width: 100%;
-  max-width: 1240px;
   margin: 0 auto 18px;
   padding: 0 20px;
   text-align: center;
